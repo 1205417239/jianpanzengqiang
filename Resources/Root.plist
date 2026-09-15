@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>title</key>
+    <string>键盘增强</string>
+
+    <key>items</key>
+    <array>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>键盘工具栏</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>default</key>
+            <true/>
+            <key>defaults</key>
+            <string>com.keyboardtoolskayoko</string>
+            <key>key</key>
+            <string>Enabled</string>
+            <key>label</key>
+            <string>启用键盘增强</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>footerText</key>
+            <string>工具栏固定为：剪贴板、全选、粘贴、撤销、收起键盘。</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>剪贴板</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>default</key>
+            <true/>
+            <key>defaults</key>
+            <string>com.keyboardtoolskayoko</string>
+            <key>key</key>
+            <string>RecordClipboard</string>
+            <key>label</key>
+            <string>记录剪贴板</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSLinkListCell</string>
+            <key>defaults</key>
+            <string>com.keyboardtoolskayoko</string>
+            <key>key</key>
+            <string>HistoryLimit</string>
+            <key>label</key>
+            <string>历史记录数量</string>
+            <key>validTitles</key>
+            <array>
+                <string>10 条</string>
+                <string>20 条</string>
+                <string>50 条</string>
+                <string>100 条</string>
+            </array>
+            <key>validValues</key>
+            <array>
+                <integer>10</integer>
+                <integer>20</integer>
+                <integer>50</integer>
+                <integer>100</integer>
+            </array>
+            <key>default</key>
+            <integer>50</integer>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>default</key>
+            <true/>
+            <key>defaults</key>
+            <string>com.keyboardtoolskayoko</string>
+            <key>key</key>
+            <string>ShowSource</string>
+            <key>label</key>
+            <string>显示来源应用</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>footerText</key>
+            <string>关闭设置后重新进入输入框即可生效。</string>
+        </dict>
+
+    </array>
+</dict>
+</plist>
