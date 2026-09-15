@@ -1,5 +1,4 @@
 #import "KTClipboardManager.h"
-#import <objc/runtime.h>
 #import "KTSettings.h"
 
 static NSString * const KTStoreKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.plist";
