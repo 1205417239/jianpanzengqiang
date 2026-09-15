@@ -4,35 +4,24 @@
 #import <UIKit/UIKit.h>
 
 @interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource>
-
 @property(nonatomic,strong) id<UITextInput> input;
 @property(nonatomic,strong) UISegmentedControl *segment;
 @property(nonatomic,strong) UITableView *table;
 @property(nonatomic,strong) NSArray *items;
-@property(nonatomic,assign) BOOL favoritesMode;
 @property(nonatomic,strong) UIView *grabber;
-@property(nonatomic,assign) CGFloat panStartHeight;
-@property(nonatomic,assign) CGFloat panStartY;
-@property(nonatomic,assign) BOOL panExpanded;
-
+@property(nonatomic,assign) CGFloat dragStartHeight;
 @end
 
 @implementation KTClipboardViewController
 
 - (instancetype)initWithInput:(id<UITextInput>)input {
     self = [super initWithNibName:nil bundle:nil];
-
-    if (self) {
-        _input = input;
-    }
-
+    if (self) _input = input;
     return self;
 }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-
-    self.title = @"剪贴板";
     self.view.backgroundColor = UIColor.systemBackgroundColor;
     self.view.layer.cornerRadius = 20.0;
     self.view.layer.masksToBounds = YES;
@@ -43,96 +32,49 @@
     self.grabber.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.grabber];
 
-    UIPanGestureRecognizer *pan =
-        [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.grabber addGestureRecognizer:pan];
 
     UIView *top = [UIView new];
     top.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:top];
 
-    UIButton *clearImage =
-        [UIButton buttonWithType:UIButtonTypeSystem];
-
-    [clearImage setTitle:@"清除图片"
-                forState:UIControlStateNormal];
-
-    clearImage.titleLabel.font =
-        [UIFont systemFontOfSize:20.0];
-
-    [clearImage setImage:
-        [UIImage systemImageNamed:@"photo.on.rectangle"]
-              forState:UIControlStateNormal];
-
-    clearImage.semanticContentAttribute =
-        UISemanticContentAttributeForceRightToLeft;
-
-    [clearImage addTarget:self
-                   action:@selector(clearImages)
-         forControlEvents:UIControlEventTouchUpInside];
-
+    UIButton *clearImage = [UIButton buttonWithType:UIButtonTypeSystem];
+    [clearImage setTitle:@"清除图片" forState:UIControlStateNormal];
+    clearImage.titleLabel.font = [UIFont systemFontOfSize:20.0];
+    [clearImage setImage:[UIImage systemImageNamed:@"photo.on.rectangle"] forState:UIControlStateNormal];
+    clearImage.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
+    [clearImage addTarget:self action:@selector(clearImages) forControlEvents:UIControlEventTouchUpInside];
     clearImage.translatesAutoresizingMaskIntoConstraints = NO;
     [top addSubview:clearImage];
 
-    UIButton *clear =
-        [UIButton buttonWithType:UIButtonTypeSystem];
-
-    [clear setTitle:@"清除剪贴板"
-           forState:UIControlStateNormal];
-
-    clear.titleLabel.font =
-        [UIFont systemFontOfSize:20.0];
-
-    [clear setImage:
-        [UIImage systemImageNamed:@"trash"]
-          forState:UIControlStateNormal];
-
-    clear.semanticContentAttribute =
-        UISemanticContentAttributeForceRightToLeft;
-
-    [clear setTitleColor:UIColor.systemRedColor
-                forState:UIControlStateNormal];
-
+    UIButton *clear = [UIButton buttonWithType:UIButtonTypeSystem];
+    [clear setTitle:@"清除剪贴板" forState:UIControlStateNormal];
+    clear.titleLabel.font = [UIFont systemFontOfSize:20.0];
+    [clear setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
+    clear.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
+    [clear setTitleColor:UIColor.systemRedColor forState:UIControlStateNormal];
     clear.tintColor = UIColor.systemRedColor;
-
-    [clear addTarget:self
-              action:@selector(clearHistory)
-    forControlEvents:UIControlEventTouchUpInside];
-
+    [clear addTarget:self action:@selector(clearHistory) forControlEvents:UIControlEventTouchUpInside];
     clear.translatesAutoresizingMaskIntoConstraints = NO;
     [top addSubview:clear];
 
     UIView *line = [UIView new];
-
     line.backgroundColor = UIColor.separatorColor;
     line.translatesAutoresizingMaskIntoConstraints = NO;
-
     [top addSubview:line];
 
-    self.segment =
-        [[UISegmentedControl alloc]
-            initWithItems:@[@"剪贴板", @"收藏夹"]];
-
+    self.segment = [[UISegmentedControl alloc] initWithItems:@[@"剪贴板", @"收藏夹"]];
     self.segment.selectedSegmentIndex = 0;
-
-    [self.segment addTarget:self
-                     action:@selector(segmentChanged:)
-           forControlEvents:UIControlEventValueChanged];
-
+    [self.segment addTarget:self action:@selector(segmentChanged:) forControlEvents:UIControlEventValueChanged];
     self.segment.translatesAutoresizingMaskIntoConstraints = NO;
-
     [self.view addSubview:self.segment];
 
-    self.table =
-        [[UITableView alloc]
-            initWithFrame:CGRectZero
-                   style:UITableViewStylePlain];
-
+    self.table = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.table.delegate = self;
     self.table.dataSource = self;
     self.table.separatorColor = UIColor.separatorColor;
     self.table.translatesAutoresizingMaskIntoConstraints = NO;
-
     [self.view addSubview:self.table];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -140,107 +82,43 @@
         [self.grabber.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.grabber.widthAnchor constraintEqualToConstant:42.0],
         [self.grabber.heightAnchor constraintEqualToConstant:6.0],
-
-        [top.topAnchor
-            constraintEqualToAnchor:
-                self.view.safeAreaLayoutGuide.topAnchor],
-
-        [top.leadingAnchor
-            constraintEqualToAnchor:self.view.leadingAnchor],
-
-        [top.trailingAnchor
-            constraintEqualToAnchor:self.view.trailingAnchor],
-
-        [top.heightAnchor
-            constraintEqualToConstant:96.0],
-
-        [clearImage.leadingAnchor
-            constraintEqualToAnchor:top.leadingAnchor
-            constant:28.0],
-
-        [clearImage.trailingAnchor
-            constraintEqualToAnchor:top.trailingAnchor
-            constant:-28.0],
-
-        [clearImage.topAnchor
-            constraintEqualToAnchor:top.topAnchor
-            constant:8.0],
-
-        [clearImage.heightAnchor
-            constraintEqualToConstant:42.0],
-
-        [line.leadingAnchor
-            constraintEqualToAnchor:top.leadingAnchor],
-
-        [line.trailingAnchor
-            constraintEqualToAnchor:top.trailingAnchor],
-
-        [line.topAnchor
-            constraintEqualToAnchor:clearImage.bottomAnchor],
-
-        [line.heightAnchor
-            constraintEqualToConstant:0.5],
-
-        [clear.leadingAnchor
-            constraintEqualToAnchor:top.leadingAnchor
-            constant:28.0],
-
-        [clear.trailingAnchor
-            constraintEqualToAnchor:top.trailingAnchor
-            constant:-28.0],
-
-        [clear.topAnchor
-            constraintEqualToAnchor:line.bottomAnchor],
-
-        [clear.heightAnchor
-            constraintEqualToConstant:42.0],
-
-        [self.segment.centerXAnchor
-            constraintEqualToAnchor:self.view.centerXAnchor],
-
-        [self.segment.topAnchor
-            constraintEqualToAnchor:top.bottomAnchor
-            constant:10.0],
-
-        [self.segment.widthAnchor
-            constraintEqualToConstant:260.0],
-
-        [self.segment.heightAnchor
-            constraintEqualToConstant:40.0],
-
-        [self.table.topAnchor
-            constraintEqualToAnchor:self.segment.bottomAnchor
-            constant:12.0],
-
-        [self.table.leadingAnchor
-            constraintEqualToAnchor:self.view.leadingAnchor],
-
-        [self.table.trailingAnchor
-            constraintEqualToAnchor:self.view.trailingAnchor],
-
-        [self.table.bottomAnchor
-            constraintEqualToAnchor:self.view.bottomAnchor]
+        [top.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [top.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [top.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [top.heightAnchor constraintEqualToConstant:96.0],
+        [clearImage.leadingAnchor constraintEqualToAnchor:top.leadingAnchor constant:28.0],
+        [clearImage.trailingAnchor constraintEqualToAnchor:top.trailingAnchor constant:-28.0],
+        [clearImage.topAnchor constraintEqualToAnchor:top.topAnchor constant:8.0],
+        [clearImage.heightAnchor constraintEqualToConstant:42.0],
+        [line.leadingAnchor constraintEqualToAnchor:top.leadingAnchor],
+        [line.trailingAnchor constraintEqualToAnchor:top.trailingAnchor],
+        [line.topAnchor constraintEqualToAnchor:clearImage.bottomAnchor],
+        [line.heightAnchor constraintEqualToConstant:0.5],
+        [clear.leadingAnchor constraintEqualToAnchor:top.leadingAnchor constant:28.0],
+        [clear.trailingAnchor constraintEqualToAnchor:top.trailingAnchor constant:-28.0],
+        [clear.topAnchor constraintEqualToAnchor:line.bottomAnchor],
+        [clear.heightAnchor constraintEqualToConstant:42.0],
+        [self.segment.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.segment.topAnchor constraintEqualToAnchor:top.bottomAnchor constant:10.0],
+        [self.segment.widthAnchor constraintEqualToConstant:260.0],
+        [self.segment.heightAnchor constraintEqualToConstant:40.0],
+        [self.table.topAnchor constraintEqualToAnchor:self.segment.bottomAnchor constant:12.0],
+        [self.table.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.table.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.table.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor]
     ]];
 
     [self reload];
 }
 
 - (void)reload {
-    if (self.favoritesMode) {
-        self.items =
-            [KTClipboardManager.sharedManager favorites];
-    } else {
-        self.items =
-            [KTClipboardManager.sharedManager items];
-    }
-
+    self.items = self.segment.selectedSegmentIndex == 1
+        ? KTClipboardManager.sharedManager.favorites
+        : KTClipboardManager.sharedManager.items;
     [self.table reloadData];
 }
 
 - (void)segmentChanged:(UISegmentedControl *)sender {
-    self.favoritesMode =
-        (sender.selectedSegmentIndex == 1);
-
     [self reload];
 }
 
@@ -253,194 +131,96 @@
     [self reload];
 }
 
-#pragma mark - UITableView
-
-- (NSInteger)tableView:(UITableView *)tableView
- numberOfRowsInSection:(NSInteger)section {
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     return self.items.count;
 }
 
-- (CGFloat)tableView:(UITableView *)tableView
-heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     return 92.0;
 }
 
-- (UITableViewCell *)tableView:(UITableView *)tableView
-         cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.row >= self.items.count) return [UITableViewCell new];
+    KTClipboardItem *item = self.items[indexPath.row];
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"clip"];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"clip"];
 
-    if (indexPath.row >= self.items.count)
-        return [UITableViewCell new];
-
-    KTClipboardItem *item =
-        self.items[indexPath.row];
-
-    UITableViewCell *cell =
-        [tableView dequeueReusableCellWithIdentifier:@"clip"];
-
-    if (!cell) {
-        cell =
-            [[UITableViewCell alloc]
-                initWithStyle:UITableViewCellStyleSubtitle
-             reuseIdentifier:@"clip"];
-    }
-
-    cell.textLabel.font =
-        [UIFont systemFontOfSize:20.0];
-
-    cell.detailTextLabel.font =
-        [UIFont systemFontOfSize:16.0];
-
+    cell.textLabel.font = [UIFont systemFontOfSize:20.0];
+    cell.detailTextLabel.font = [UIFont systemFontOfSize:16.0];
     cell.detailTextLabel.numberOfLines = 1;
 
-    BOOL showSource = YES;
-
-    showSource = KTShowSource();
-
-    if (showSource) {
-        cell.textLabel.text =
-            item.appName.length
-                ? item.appName
-                : @"未知应用";
-
-        cell.detailTextLabel.text =
-            item.text ?: @"";
+    if (KTShowSource()) {
+        cell.textLabel.text = item.appName.length ? item.appName : @"未知应用";
+        cell.detailTextLabel.text = item.text ?: @"";
     } else {
-        cell.textLabel.text =
-            item.text ?: @"";
-
+        cell.textLabel.text = item.text ?: @"";
         cell.detailTextLabel.text = @"";
     }
 
-    cell.accessoryType =
-        item.favorite
-            ? UITableViewCellAccessoryCheckmark
-            : UITableViewCellAccessoryNone;
-
-    cell.imageView.image =
-        [UIImage systemImageNamed:@"doc.on.clipboard"];
-
+    cell.accessoryType = item.favorite ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    cell.imageView.image = [UIImage systemImageNamed:@"doc.on.clipboard"];
     return cell;
 }
 
-- (void)tableView:(UITableView *)tableView
-didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-
-    if (indexPath.row >= self.items.count)
-        return;
-
-    KTClipboardItem *item =
-        self.items[indexPath.row];
-
-    if (item.text.length > 0 && self.input) {
-        [KTClipboardManager.sharedManager
-            pasteItem:item
-            intoInput:self.input];
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.row >= self.items.count) return;
+    KTClipboardItem *item = self.items[indexPath.row];
+    if (item.text.length && self.input) {
+        [KTClipboardManager.sharedManager pasteItem:item intoInput:self.input];
     }
-
-    [tableView deselectRowAtIndexPath:indexPath
-                             animated:YES];
-
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
     [self closePage];
 }
 
-- (void)tableView:(UITableView *)tableView
-commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
-forRowAtIndexPath:(NSIndexPath *)indexPath {
-
-    if (editingStyle !=
-        UITableViewCellEditingStyleDelete)
-        return;
-
-    if (indexPath.row >= self.items.count)
-        return;
-
-    KTClipboardItem *item =
-        self.items[indexPath.row];
-
-    [KTClipboardManager.sharedManager
-        removeItem:item];
-
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (editingStyle != UITableViewCellEditingStyleDelete || indexPath.row >= self.items.count) return;
+    [KTClipboardManager.sharedManager removeItem:self.items[indexPath.row]];
     [self reload];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
     UIWindow *window = self.view.window;
-    if (!window)
-        return;
+    if (!window) return;
 
+    const CGFloat minHeight = 468.0;
+    const CGFloat maxHeight = 800.0;
+    CGFloat screenWidth = CGRectGetWidth(window.bounds);
+    CGFloat screenHeight = CGRectGetHeight(window.bounds);
     CGPoint translation = [pan translationInView:window];
     CGPoint velocity = [pan velocityInView:window];
-    CGFloat screenHeight = CGRectGetHeight(window.bounds);
-    CGFloat screenWidth = CGRectGetWidth(window.bounds);
-    const CGFloat baseHeight = 468.0;
-    const CGFloat maxHeight = 800.0;
 
     if (pan.state == UIGestureRecognizerStateBegan) {
-        CGRect frame = self.view.frame;
-        self.panStartHeight = CGRectGetHeight(frame);
-        self.panStartY = CGRectGetMinY(frame);
-        self.panExpanded = self.panStartHeight > baseHeight + 20.0;
+        self.dragStartHeight = CGRectGetHeight(self.view.frame);
         return;
     }
 
     if (pan.state == UIGestureRecognizerStateChanged) {
-        CGFloat height = self.panStartHeight - translation.y;
-        height = MAX(baseHeight, MIN(maxHeight, height));
-
-        if (translation.y > 0.0 && self.panStartHeight <= baseHeight + 20.0) {
-            CGRect frame = self.view.frame;
-            frame.origin.y = self.panStartY + translation.y;
-            frame.size.height = baseHeight;
-            self.view.frame = frame;
-        } else {
-            self.view.frame = CGRectMake(0.0,
-                                         screenHeight - height,
-                                         screenWidth,
-                                         height);
-        }
+        CGFloat height = self.dragStartHeight - translation.y;
+        height = MAX(minHeight, MIN(maxHeight, height));
+        self.view.frame = CGRectMake(0.0, screenHeight - height, screenWidth, height);
         return;
     }
 
-    if (pan.state != UIGestureRecognizerStateEnded &&
-        pan.state != UIGestureRecognizerStateCancelled)
-        return;
+    if (pan.state != UIGestureRecognizerStateEnded && pan.state != UIGestureRecognizerStateCancelled) return;
 
-    if (translation.y > 80.0 || velocity.y > 900.0) {
+    if (translation.y > 90.0 || velocity.y > 900.0) {
         [self closePage];
         return;
     }
 
     CGFloat currentHeight = CGRectGetHeight(self.view.frame);
-    BOOL draggingUp = translation.y < -80.0 || velocity.y < -700.0;
-    BOOL draggingDown = translation.y > 50.0 || velocity.y > 500.0;
-    CGFloat targetHeight = currentHeight;
+    CGFloat targetHeight = translation.y < -70.0 || velocity.y < -700.0
+        ? maxHeight
+        : (currentHeight > minHeight + 20.0 ? maxHeight : minHeight);
 
-    if (draggingUp)
-        targetHeight = maxHeight;
-    else if (draggingDown && currentHeight > baseHeight + 20.0)
-        targetHeight = baseHeight;
-    else if (currentHeight <= baseHeight + 20.0)
-        targetHeight = baseHeight;
-    else
-        targetHeight = maxHeight;
-
-    CGRect target = CGRectMake(0.0,
-                               screenHeight - targetHeight,
-                               screenWidth,
-                               targetHeight);
-
-    [UIView animateWithDuration:0.20
-                          delay:0.0
-                        options:UIViewAnimationOptionCurveEaseOut
-                     animations:^{
+    CGRect target = CGRectMake(0.0, screenHeight - targetHeight, screenWidth, targetHeight);
+    [UIView animateWithDuration:0.20 animations:^{
         self.view.frame = target;
-    }
-                     completion:nil];
+    }];
 }
 
 - (void)closePage {
-    if (self.closeHandler)
-        self.closeHandler();
+    if (self.closeHandler) self.closeHandler();
 }
 
 @end
