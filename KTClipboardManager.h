@@ -5,6 +5,7 @@
 @property(nonatomic,copy) NSString *bundleIdentifier;
 @property(nonatomic,copy) NSString *appName;
 @property(nonatomic,strong) NSDate *recordedAt;
+@property(nonatomic,strong) NSData *imageData;
 @property(nonatomic,assign) BOOL favorite;
 - (NSDictionary *)dictionary;
 + (instancetype)itemWithDictionary:(NSDictionary *)d;
