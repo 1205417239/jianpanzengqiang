@@ -5,7 +5,6 @@
 
 @interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource>
 @property(nonatomic,strong) id<UITextInput> input;
-@property(nonatomic,strong) UIView *panel;
 @property(nonatomic,strong) UISegmentedControl *segment;
 @property(nonatomic,strong) UITableView *table;
 @property(nonatomic,strong) NSArray *items;

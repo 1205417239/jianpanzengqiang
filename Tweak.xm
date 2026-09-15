@@ -9,6 +9,20 @@ static UIWindow *KTClipboardWindow;
 static KTClipboardViewController *KTClipboardController;
 static UIResponder *KTClipboardInput;
 
+@interface KTClipboardPassThroughWindow : UIWindow
+@property(nonatomic,weak) UIView *interactiveView;
+@end
+
+@implementation KTClipboardPassThroughWindow
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *view = self.interactiveView;
+    if (!view || self.hidden || self.alpha <= 0.01) return nil;
+    CGPoint local = [view convertPoint:point fromView:self];
+    if (!CGRectContainsPoint(view.bounds, local)) return nil;
+    return [super hitTest:point withEvent:event];
+}
+@end
+
 static NSArray<UIWindow *> *KTWindows(void) {
     NSMutableArray *windows = [NSMutableArray array];
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -30,7 +44,20 @@ static UIResponder *KTFindFirstResponder(UIView *view) {
 }
 
 static UIResponder *KTInput(void) {
+    UIWindow *keyWindow = nil;
     for (UIWindow *window in KTWindows()) {
+        if (window.hidden || window.alpha <= 0.01) continue;
+        if (window.windowLevel != UIWindowLevelNormal) continue;
+        if (window.isKeyWindow) { keyWindow = window; break; }
+        if (!keyWindow) keyWindow = window;
+    }
+    if (keyWindow) {
+        UIResponder *r = KTFindFirstResponder(keyWindow);
+        if (r && [r conformsToProtocol:@protocol(UITextInput)]) return r;
+    }
+    for (UIWindow *window in KTWindows()) {
+        if (window.hidden || window.alpha <= 0.01) continue;
+        if (window.windowLevel != UIWindowLevelNormal || window == keyWindow) continue;
         UIResponder *r = KTFindFirstResponder(window);
         if (r && [r conformsToProtocol:@protocol(UITextInput)]) return r;
     }
@@ -72,7 +99,7 @@ static void KTClipboardOpen(void) {
         KTClipboardInput = input;
         [input resignFirstResponder];
 
-        UIWindow *window = [[UIWindow alloc] initWithWindowScene:scene];
+        KTClipboardPassThroughWindow *window = [[KTClipboardPassThroughWindow alloc] initWithWindowScene:scene];
         window.frame = scene.coordinateSpace.bounds;
         window.backgroundColor = UIColor.clearColor;
         window.opaque = NO;
@@ -81,6 +108,8 @@ static void KTClipboardOpen(void) {
         KTClipboardViewController *controller = [[KTClipboardViewController alloc] initWithInput:(id<UITextInput>)input];
         controller.closeHandler = ^{ KTClipboardClose(); };
         window.rootViewController = controller;
+        [controller loadViewIfNeeded];
+        window.interactiveView = controller.panel;
         KTClipboardWindow = window;
         KTClipboardController = controller;
         window.hidden = NO;
