@@ -58,7 +58,6 @@ static void KTClipboardClose(void) {
     KTClipboardController = nil;
     KTClipboardInput = nil;
     if (!window) return;
-
     window.hidden = YES;
     window.rootViewController = nil;
 }
@@ -66,41 +65,26 @@ static void KTClipboardClose(void) {
 static void KTClipboardOpen(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (KTClipboardWindow) return;
-
         UIResponder *input = KTInput();
         UIWindowScene *scene = KTActiveScene();
         if (!input || !scene) return;
-
-        CGRect bounds = scene.coordinateSpace.bounds;
-        CGFloat width = CGRectGetWidth(bounds);
-        CGFloat height = CGRectGetHeight(bounds);
-        const CGFloat panelHeight = 468.0;
-        if (width <= 0.0 || height <= panelHeight) return;
 
         KTClipboardInput = input;
         [input resignFirstResponder];
 
         UIWindow *window = [[UIWindow alloc] initWithWindowScene:scene];
-        window.frame = bounds;
+        window.frame = scene.coordinateSpace.bounds;
         window.backgroundColor = UIColor.clearColor;
         window.opaque = NO;
         window.windowLevel = UIWindowLevelAlert + 1000.0;
 
         KTClipboardViewController *controller = [[KTClipboardViewController alloc] initWithInput:(id<UITextInput>)input];
         controller.closeHandler = ^{ KTClipboardClose(); };
-
         window.rootViewController = controller;
         KTClipboardWindow = window;
         KTClipboardController = controller;
         window.hidden = NO;
-
-        controller.view.frame = CGRectMake(0.0, height, width, panelHeight);
-        [window layoutIfNeeded];
-
-        CGRect target = CGRectMake(0.0, height - panelHeight, width, panelHeight);
-        [UIView animateWithDuration:0.22 animations:^{
-            controller.view.frame = target;
-        }];
+        [window makeKeyAndVisible];
     });
 }
 
