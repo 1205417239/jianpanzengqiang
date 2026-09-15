@@ -3,7 +3,6 @@
 #import <objc/message.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import "KTClipboardViewController.h"
-#import "KTClipboardManager.h"
 
 static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
@@ -119,7 +118,7 @@ static void KTClipboardOpen(void) {
         KTClipboardWindow = window;
         KTClipboardController = controller;
         window.hidden = NO;
-        [window setNeedsLayout];
+        [window makeKeyAndVisible];
     });
 }
 
@@ -235,7 +234,6 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
-        dispatch_async(dispatch_get_main_queue(), ^{ [[KTClipboardManager sharedManager] startMonitoring]; });
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
             CFSTR("com.keyboardtoolskayoko.reload"), NULL,

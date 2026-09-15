@@ -3,87 +3,14 @@
 #import "KTSettings.h"
 #import <UIKit/UIKit.h>
 
-@interface KTClipboardCell : UITableViewCell
-@property(nonatomic,strong) UILabel *numberLabel;
-@property(nonatomic,strong) UILabel *contentLabel;
-@property(nonatomic,strong) UILabel *sourceLabel;
-@property(nonatomic,strong) UILabel *timeLabel;
-@property(nonatomic,strong) UILabel *dateLabel;
-@property(nonatomic,strong) UIImageView *thumbView;
-@end
-
-@implementation KTClipboardCell
-- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
-    if ((self = [super initWithStyle:UITableViewCellStyleDefault reuseIdentifier:reuseIdentifier])) {
-        self.backgroundColor = UIColor.clearColor;
-        self.contentView.backgroundColor = UIColor.whiteColor;
-        self.contentView.layer.cornerRadius = 10.0;
-        self.contentView.layer.masksToBounds = YES;
-
-        _numberLabel = [UILabel new];
-        _numberLabel.font = [UIFont monospacedDigitSystemFontOfSize:15.0 weight:UIFontWeightSemibold];
-        _numberLabel.textAlignment = NSTextAlignmentCenter;
-        _numberLabel.textColor = UIColor.secondaryLabelColor;
-        [self.contentView addSubview:_numberLabel];
-
-        _contentLabel = [UILabel new];
-        _contentLabel.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightRegular];
-        _contentLabel.textColor = UIColor.labelColor;
-        _contentLabel.numberOfLines = 2;
-        [self.contentView addSubview:_contentLabel];
-
-        _sourceLabel = [UILabel new];
-        _sourceLabel.font = [UIFont systemFontOfSize:12.0];
-        _sourceLabel.textColor = UIColor.secondaryLabelColor;
-        [self.contentView addSubview:_sourceLabel];
-
-        _timeLabel = [UILabel new];
-        _timeLabel.font = [UIFont monospacedDigitSystemFontOfSize:13.0 weight:UIFontWeightMedium];
-        _timeLabel.textColor = UIColor.secondaryLabelColor;
-        _timeLabel.textAlignment = NSTextAlignmentRight;
-        [self.contentView addSubview:_timeLabel];
-
-        _dateLabel = [UILabel new];
-        _dateLabel.font = [UIFont systemFontOfSize:11.0];
-        _dateLabel.textColor = UIColor.tertiaryLabelColor;
-        _dateLabel.textAlignment = NSTextAlignmentRight;
-        [self.contentView addSubview:_dateLabel];
-        _thumbView = [UIImageView new];
-        _thumbView.contentMode = UIViewContentModeScaleAspectFill;
-        _thumbView.layer.cornerRadius = 6.0;
-        _thumbView.clipsToBounds = YES;
-        _thumbView.hidden = YES;
-        [self.contentView addSubview:_thumbView];
-    }
-    return self;
-}
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGFloat w = CGRectGetWidth(self.contentView.bounds);
-    CGFloat h = CGRectGetHeight(self.contentView.bounds);
-    self.numberLabel.frame = CGRectMake(8.0, 0.0, 28.0, h);
-    self.timeLabel.frame = CGRectMake(w - 76.0, 18.0, 66.0, 20.0);
-    self.dateLabel.frame = CGRectMake(w - 82.0, 41.0, 72.0, 18.0);
-    CGFloat left = 44.0;
-    CGFloat right = w - 92.0;
-    self.contentLabel.frame = CGRectMake(left, 12.0, MAX(80.0, right - left), 42.0);
-    self.sourceLabel.frame = CGRectMake(left, 56.0, MAX(80.0, right - left), 17.0);
-    self.thumbView.frame = CGRectMake(left, 10.0, 42.0, 42.0);
-}
-@end
-
 @interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource>
 @property(nonatomic,strong) id<UITextInput> input;
-@property(nonatomic,strong) UIButton *menuButton;
-@property(nonatomic,strong) UIButton *clipboardTab;
-@property(nonatomic,strong) UIButton *favoriteTab;
-@property(nonatomic,strong) UIView *tabIndicator;
+@property(nonatomic,strong) UISegmentedControl *segment;
 @property(nonatomic,strong) UITableView *table;
 @property(nonatomic,strong) NSArray *items;
 @property(nonatomic,strong) UIView *grabber;
-@property(nonatomic,strong) UIView *menuCard;
-@property(nonatomic,assign) BOOL menuVisible;
-@property(nonatomic,assign) NSInteger segmentIndex;
+@property(nonatomic,assign) CGFloat dragStartHeight;
+@property(nonatomic,assign) BOOL dragging;
 @end
 
 @implementation KTClipboardViewController
@@ -99,95 +26,71 @@
     self.view.backgroundColor = UIColor.clearColor;
 
     self.panel = [UIView new];
-    self.panel.backgroundColor = [UIColor colorWithWhite:0.93 alpha:1.0];
-    self.panel.layer.cornerRadius = 14.0;
-    self.panel.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    self.panel.backgroundColor = UIColor.systemBackgroundColor;
+    self.panel.layer.cornerRadius = 20.0;
     self.panel.layer.masksToBounds = YES;
     [self.view addSubview:self.panel];
 
     self.grabber = [UIView new];
-    self.grabber.backgroundColor = [UIColor colorWithWhite:0.60 alpha:1.0];
-    self.grabber.layer.cornerRadius = 2.5;
+    self.grabber.backgroundColor = UIColor.secondaryLabelColor;
+    self.grabber.layer.cornerRadius = 3.0;
+    [self.panel addSubview:self.grabber];
     self.grabber.userInteractionEnabled = YES;
     [self.grabber addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)]];
-    [self.panel addSubview:self.grabber];
+    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    panelPan.cancelsTouchesInView = NO;
+    [self.panel addGestureRecognizer:panelPan];
 
-    self.menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.menuButton.tintColor = UIColor.labelColor;
-    [self.menuButton setImage:[UIImage systemImageNamed:@"line.3.horizontal"] forState:UIControlStateNormal];
-    self.menuButton.accessibilityLabel = @"菜单";
-    [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-    [self.panel addSubview:self.menuButton];
+    UIView *top = [UIView new];
+    [self.panel addSubview:top];
 
-    self.clipboardTab = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.favoriteTab = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.clipboardTab.selected = YES;
-    self.favoriteTab.selected = NO;
-    self.segmentIndex = 0;
-    [self.clipboardTab setTitle:@"剪贴板" forState:UIControlStateNormal];
-    [self.favoriteTab setTitle:@"收藏夹" forState:UIControlStateNormal];
-    self.clipboardTab.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
-    self.favoriteTab.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightRegular];
-    [self.clipboardTab addTarget:self action:@selector(selectClipboard) forControlEvents:UIControlEventTouchUpInside];
-    [self.favoriteTab addTarget:self action:@selector(selectFavorites) forControlEvents:UIControlEventTouchUpInside];
-    [self.panel addSubview:self.clipboardTab];
-    [self.panel addSubview:self.favoriteTab];
+    UIButton *clearImage = [UIButton buttonWithType:UIButtonTypeSystem];
+    [clearImage setTitle:@"清除图片" forState:UIControlStateNormal];
+    clearImage.titleLabel.font = [UIFont systemFontOfSize:20.0];
+    [clearImage setImage:[UIImage systemImageNamed:@"photo.on.rectangle"] forState:UIControlStateNormal];
+    clearImage.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
+    [clearImage addTarget:self action:@selector(clearImages) forControlEvents:UIControlEventTouchUpInside];
+    [top addSubview:clearImage];
 
-    self.tabIndicator = [UIView new];
-    self.tabIndicator.backgroundColor = UIColor.labelColor;
-    self.tabIndicator.layer.cornerRadius = 1.5;
-    [self.panel addSubview:self.tabIndicator];
+    UIButton *clear = [UIButton buttonWithType:UIButtonTypeSystem];
+    [clear setTitle:@"清除剪贴板" forState:UIControlStateNormal];
+    clear.titleLabel.font = [UIFont systemFontOfSize:20.0];
+    [clear setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
+    clear.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
+    [clear setTitleColor:UIColor.systemRedColor forState:UIControlStateNormal];
+    clear.tintColor = UIColor.systemRedColor;
+    [clear addTarget:self action:@selector(clearHistory) forControlEvents:UIControlEventTouchUpInside];
+    [top addSubview:clear];
+
+    UIView *line = [UIView new];
+    line.backgroundColor = UIColor.separatorColor;
+    [top addSubview:line];
+
+    self.segment = [[UISegmentedControl alloc] initWithItems:@[@"剪贴板", @"收藏夹"]];
+    self.segment.selectedSegmentIndex = 0;
+    [self.segment addTarget:self action:@selector(segmentChanged:) forControlEvents:UIControlEventValueChanged];
+    [self.panel addSubview:self.segment];
 
     self.table = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.table.delegate = self;
     self.table.dataSource = self;
-    self.table.backgroundColor = UIColor.clearColor;
-    self.table.separatorStyle = UITableViewCellSeparatorStyleNone;
-    self.table.showsVerticalScrollIndicator = YES;
-    self.table.contentInset = UIEdgeInsetsMake(4.0, 0.0, 12.0, 0.0);
-    self.table.scrollIndicatorInsets = UIEdgeInsetsMake(4.0, 2.0, 12.0, 2.0);
+    self.table.separatorColor = UIColor.separatorColor;
     [self.panel addSubview:self.table];
 
-    [self buildMenuCard];
-}
-
-- (void)buildMenuCard {
-    self.menuCard = [UIView new];
-    self.menuCard.backgroundColor = UIColor.systemBackgroundColor;
-    self.menuCard.layer.cornerRadius = 13.0;
-    self.menuCard.layer.shadowColor = UIColor.blackColor.CGColor;
-    self.menuCard.layer.shadowOpacity = 0.12;
-    self.menuCard.layer.shadowRadius = 10.0;
-    self.menuCard.layer.shadowOffset = CGSizeMake(0.0, 3.0);
-    self.menuCard.hidden = YES;
-    [self.panel addSubview:self.menuCard];
-
-    UIButton *clearHistory = [UIButton buttonWithType:UIButtonTypeSystem];
-    clearHistory.tag = 1;
-    clearHistory.tintColor = UIColor.systemRedColor;
-    [clearHistory setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
-    clearHistory.accessibilityLabel = @"清除剪贴板";
-    [clearHistory addTarget:self action:@selector(menuAction:) forControlEvents:UIControlEventTouchUpInside];
-    [self.menuCard addSubview:clearHistory];
-
-    UIButton *clearImages = [UIButton buttonWithType:UIButtonTypeSystem];
-    clearImages.tag = 2;
-    clearImages.tintColor = UIColor.systemBlueColor;
-    [clearImages setImage:[UIImage systemImageNamed:@"photo.on.rectangle"] forState:UIControlStateNormal];
-    clearImages.accessibilityLabel = @"清除照片";
-    [clearImages addTarget:self action:@selector(menuAction:) forControlEvents:UIControlEventTouchUpInside];
-    [self.menuCard addSubview:clearImages];
+    self.grabber.frame = CGRectMake(0.0, 7.0, 42.0, 6.0);
+    self.grabber.center = CGPointMake(CGRectGetMidX(self.panel.bounds), 10.0);
 }
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     [self layoutPanel];
     [self reload];
+    CGRect target = self.panel.frame;
     CGFloat h = CGRectGetHeight(self.view.bounds);
-    CGFloat w = CGRectGetWidth(self.view.bounds);
-    CGRect target = CGRectMake(0.0, h - 400.0, w, 400.0);
-    self.panel.frame = CGRectMake(0.0, h, w, 400.0);
-    [UIView animateWithDuration:0.22 animations:^{ self.panel.frame = target; }];
+    self.panel.frame = CGRectMake(0.0, h, CGRectGetWidth(self.view.bounds), 468.0);
+    [UIView animateWithDuration:0.22 animations:^{
+        self.panel.frame = target;
+    }];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -199,110 +102,59 @@
     CGFloat width = CGRectGetWidth(self.view.bounds);
     CGFloat height = CGRectGetHeight(self.view.bounds);
     if (width <= 0.0 || height <= 0.0) return;
-
-    const CGFloat panelHeight = 400.0;
+    CGFloat panelHeight = 468.0;
     self.panel.frame = CGRectMake(0.0, height - panelHeight, width, panelHeight);
-    self.grabber.frame = CGRectMake((width - 38.0) / 2.0, 7.0, 38.0, 5.0);
-    self.menuButton.frame = CGRectMake(14.0, 20.0, 38.0, 38.0);
 
-    CGFloat tabsWidth = MIN(220.0, width - 100.0);
-    CGFloat tabsX = (width - tabsWidth) / 2.0;
-    self.clipboardTab.frame = CGRectMake(tabsX, 20.0, tabsWidth / 2.0, 38.0);
-    self.favoriteTab.frame = CGRectMake(tabsX + tabsWidth / 2.0, 20.0, tabsWidth / 2.0, 38.0);
-    self.tabIndicator.frame = CGRectMake(tabsX + (self.segmentIndex * tabsWidth / 2.0) + 28.0, 55.0, tabsWidth / 2.0 - 56.0, 3.0);
+    self.grabber.frame = CGRectMake((width - 42.0) / 2.0, 7.0, 42.0, 6.0);
 
-    self.table.frame = CGRectMake(8.0, 66.0, width - 16.0, panelHeight - 66.0);
-    self.menuCard.frame = CGRectMake(14.0, 60.0, 132.0, 54.0);
-    NSArray *buttons = self.menuCard.subviews;
-    if (buttons.count >= 2) {
-        ((UIView *)buttons[0]).frame = CGRectMake(8.0, 7.0, 50.0, 40.0);
-        ((UIView *)buttons[1]).frame = CGRectMake(74.0, 7.0, 50.0, 40.0);
+    CGFloat topY = 0.0;
+    CGFloat topH = 96.0;
+    UIView *top = self.panel.subviews.count > 1 ? self.panel.subviews[1] : nil;
+    if (top) {
+        top.frame = CGRectMake(0.0, topY, width, topH);
+        NSArray *buttons = [top.subviews filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(UIView *obj, NSDictionary *bindings) { return [obj isKindOfClass:UIButton.class]; }]];
+        UIButton *clearImage = buttons.count > 0 ? buttons[0] : nil;
+        UIButton *clear = buttons.count > 1 ? buttons[1] : nil;
+        UIView *line = nil;
+        for (UIView *v in top.subviews) if (![v isKindOfClass:UIButton.class]) line = v;
+        if (clearImage) clearImage.frame = CGRectMake(28.0, 8.0, width - 56.0, 42.0);
+        if (line) line.frame = CGRectMake(0.0, 50.0, width, 0.5);
+        if (clear) clear.frame = CGRectMake(28.0, 50.5, width - 56.0, 42.0);
     }
-}
 
-- (void)updateTabAppearanceAnimated:(BOOL)animated {
-    BOOL favorites = self.favoriteTab.selected;
-    self.clipboardTab.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:favorites ? UIFontWeightRegular : UIFontWeightSemibold];
-    self.favoriteTab.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:favorites ? UIFontWeightSemibold : UIFontWeightRegular];
-    CGFloat width = CGRectGetWidth(self.panel.bounds);
-    CGFloat tabsWidth = MIN(220.0, width - 100.0);
-    CGFloat tabsX = (width - tabsWidth) / 2.0;
-    CGRect target = CGRectMake(tabsX + (favorites ? tabsWidth / 2.0 : 0.0) + 28.0, 55.0, tabsWidth / 2.0 - 56.0, 3.0);
-    if (animated) {
-        [UIView animateWithDuration:0.18 animations:^{ self.tabIndicator.frame = target; }];
-    } else self.tabIndicator.frame = target;
-}
-
-- (void)selectClipboard {
-    self.clipboardTab.selected = YES;
-    self.favoriteTab.selected = NO;
-    self.segmentIndex = 0;
-    [self updateTabAppearanceAnimated:YES];
-    [self reload];
-}
-
-- (void)selectFavorites {
-    self.clipboardTab.selected = NO;
-    self.favoriteTab.selected = YES;
-    self.segmentIndex = 1;
-    [self updateTabAppearanceAnimated:YES];
-    [self reload];
+    self.segment.frame = CGRectMake((width - 260.0) / 2.0, 106.0, 260.0, 40.0);
+    self.table.frame = CGRectMake(0.0, 158.0, width, MAX(0.0, panelHeight - 158.0));
 }
 
 - (void)reload {
-    self.items = self.favoriteTab.selected ? KTClipboardManager.sharedManager.favorites : KTClipboardManager.sharedManager.items;
+    self.items = self.segment.selectedSegmentIndex == 1 ? KTClipboardManager.sharedManager.favorites : KTClipboardManager.sharedManager.items;
     [self.table reloadData];
 }
 
-- (void)toggleMenu {
-    self.menuVisible = !self.menuVisible;
-    self.menuCard.hidden = NO;
-    self.menuCard.alpha = self.menuVisible ? 0.0 : 1.0;
-    [UIView animateWithDuration:0.16 animations:^{ self.menuCard.alpha = self.menuVisible ? 1.0 : 0.0; } completion:^(BOOL finished) {
-        if (!self.menuVisible) self.menuCard.hidden = YES;
-    }];
-}
-
-- (void)menuAction:(UIButton *)sender {
-    if (sender.tag == 1) {
-        [KTClipboardManager.sharedManager clearClipboardHistory];
-        [self reload];
-    } else if (sender.tag == 2) {
-        [KTClipboardManager.sharedManager clearImages];
-    }
-    self.menuVisible = NO;
-    self.menuCard.hidden = YES;
-}
+- (void)segmentChanged:(UISegmentedControl *)sender { [self reload]; }
+- (void)clearImages { [KTClipboardManager.sharedManager clearImages]; }
+- (void)clearHistory { [KTClipboardManager.sharedManager clearClipboardHistory]; [self reload]; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.items.count; }
-- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 80.0; }
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 92.0; }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.row >= self.items.count) return [UITableViewCell new];
     KTClipboardItem *item = self.items[indexPath.row];
-    KTClipboardCell *cell = [tableView dequeueReusableCellWithIdentifier:@"clip2"];
-    if (!cell) cell = [[KTClipboardCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"clip2"];
-
-    cell.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)indexPath.row + 1];
-    cell.thumbView.hidden = item.imageData.length == 0;
-    cell.thumbView.image = item.imageData.length ? [UIImage imageWithData:item.imageData] : nil;
-    cell.contentLabel.text = item.imageData.length ? @"图片" : (item.text ?: @"");
-    cell.contentLabel.hidden = item.imageData.length != 0;
-    cell.sourceLabel.text = KTShowSource() ? (item.appName.length ? item.appName : @"未知应用") : @"";
-    NSDate *date = item.recordedAt ?: NSDate.date;
-    NSDateFormatter *timeFormatter = [NSDateFormatter new];
-    timeFormatter.locale = [NSLocale localeWithLocaleIdentifier:@"zh_CN"];
-    timeFormatter.dateFormat = @"HH:mm";
-    cell.timeLabel.text = [timeFormatter stringFromDate:date];
-    NSDateFormatter *dayFormatter = [NSDateFormatter new];
-    dayFormatter.locale = [NSLocale localeWithLocaleIdentifier:@"zh_CN"];
-    dayFormatter.dateFormat = @"M月d日";
-    NSDate *now = NSDate.date;
-    NSCalendar *calendar = [NSCalendar currentCalendar];
-    BOOL today = [calendar isDate:date inSameDayAsDate:now];
-    cell.dateLabel.text = today ? @"" : [dayFormatter stringFromDate:date];
-    cell.backgroundColor = UIColor.clearColor;
-    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"clip"];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"clip"];
+    cell.textLabel.font = [UIFont systemFontOfSize:20.0];
+    cell.detailTextLabel.font = [UIFont systemFontOfSize:16.0];
+    cell.detailTextLabel.numberOfLines = 1;
+    if (KTShowSource()) {
+        cell.textLabel.text = item.appName.length ? item.appName : @"未知应用";
+        cell.detailTextLabel.text = item.text ?: @"";
+    } else {
+        cell.textLabel.text = item.text ?: @"";
+        cell.detailTextLabel.text = @"";
+    }
+    cell.accessoryType = item.favorite ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    cell.imageView.image = [UIImage systemImageNamed:@"doc.on.clipboard"];
     return cell;
 }
 
@@ -314,34 +166,49 @@
     [self closePage];
 }
 
-- (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.row >= self.items.count) return nil;
-    KTClipboardItem *item = self.items[indexPath.row];
-
-    UIContextualAction *delete = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:@"" handler:^(UIContextualAction *action, UIView *sourceView, void (^completionHandler)(BOOL)) {
-        [KTClipboardManager.sharedManager removeItem:item];
-        [self reload];
-        completionHandler(YES);
-    }];
-    delete.image = [UIImage systemImageNamed:@"trash"];
-
-    UIContextualAction *favorite = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:@"" handler:^(UIContextualAction *action, UIView *sourceView, void (^completionHandler)(BOOL)) {
-        [KTClipboardManager.sharedManager setFavorite:!item.favorite forItem:item];
-        [self reload];
-        completionHandler(YES);
-    }];
-    favorite.backgroundColor = UIColor.systemBlueColor;
-    favorite.image = [UIImage systemImageNamed:item.favorite ? @"star.slash" : @"star"];
-    return [UISwipeActionsConfiguration configurationWithActions:@[delete, favorite]];
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (editingStyle != UITableViewCellEditingStyleDelete || indexPath.row >= self.items.count) return;
+    [KTClipboardManager.sharedManager removeItem:self.items[indexPath.row]];
+    [self reload];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
-    if (pan.state != UIGestureRecognizerStateEnded) return;
+    CGFloat screenWidth = CGRectGetWidth(self.view.bounds);
+    CGFloat screenHeight = CGRectGetHeight(self.view.bounds);
+    const CGFloat minHeight = 468.0;
+    const CGFloat maxHeight = 800.0;
     CGPoint translation = [pan translationInView:self.view];
     CGPoint velocity = [pan velocityInView:self.view];
-    if (translation.y > 18.0 || velocity.y > 500.0) [self closePage];
-}
 
+    if (pan.state == UIGestureRecognizerStateBegan) {
+        self.dragStartHeight = CGRectGetHeight(self.panel.frame);
+        self.dragging = YES;
+        return;
+    }
+
+    if (pan.state == UIGestureRecognizerStateChanged) {
+        CGFloat height = MAX(minHeight, MIN(maxHeight, self.dragStartHeight - translation.y));
+        self.panel.frame = CGRectMake(0.0, screenHeight - height, screenWidth, height);
+        self.table.frame = CGRectMake(0.0, 158.0, screenWidth, MAX(0.0, height - 158.0));
+        return;
+    }
+
+    if (pan.state != UIGestureRecognizerStateEnded && pan.state != UIGestureRecognizerStateCancelled) return;
+    self.dragging = NO;
+
+    if (translation.y > 90.0 || velocity.y > 700.0) {
+        [self closePage];
+        return;
+    }
+
+    CGFloat currentHeight = CGRectGetHeight(self.panel.frame);
+    CGFloat targetHeight = (translation.y < -70.0 || velocity.y < -700.0 || currentHeight > minHeight + 20.0) ? maxHeight : minHeight;
+    CGRect target = CGRectMake(0.0, screenHeight - targetHeight, screenWidth, targetHeight);
+    [UIView animateWithDuration:0.20 animations:^{
+        self.panel.frame = target;
+        self.table.frame = CGRectMake(0.0, 158.0, screenWidth, targetHeight - 158.0);
+    }];
+}
 - (void)closePage {
     if (self.closeHandler) self.closeHandler();
 }

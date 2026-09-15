@@ -5,8 +5,6 @@
 @property(nonatomic, copy) NSString *text;
 @property(nonatomic, copy) NSString *bundleIdentifier;
 @property(nonatomic, copy) NSString *appName;
-@property(nonatomic, strong) NSDate *recordedAt;
-@property(nonatomic, assign) NSInteger changeCount;
 @property(nonatomic, assign) BOOL favorite;
 @end
 
