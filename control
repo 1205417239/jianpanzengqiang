@@ -1,9 +1,0 @@
-Package: com.keyboardtoolskayoko
-Name: KeyboardTools + Kayoko
-Version: 1.0.2
-Architecture: iphoneos-arm64
-Description: KeyboardTools-style five-button keyboard toolbar with Kayoko-inspired clipboard history UI.
-Maintainer: Local build
-Author: KeyboardTools by CrazyMind90; Kayoko by kissalexandra
-Section: Tweaks
-Depends: mobilesubstrate, preferenceloader
