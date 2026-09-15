@@ -44,6 +44,8 @@ static UIResponder *KTFindFirstResponder(UIView *view) {
 }
 
 static UIResponder *KTInput(void) {
+    UIResponder *saved = KTClipboardInput;
+    if (saved && [saved conformsToProtocol:@protocol(UITextInput)]) return saved;
     NSArray<UIWindow *> *windows = KTWindows();
     UIWindow *keyWindow = nil;
     for (UIWindow *window in windows) {
@@ -166,6 +168,18 @@ static void KTInstallToolbar(UIView *dock) {
     KTAddButton(dock, stack, @"arrow.uturn.backward", @"撤销", @selector(kt_undo:));
     KTAddButton(dock, stack, @"keyboard.chevron.compact.down", @"收起", @selector(kt_dismiss:));
 }
+
+%hook UIResponder
+
+- (BOOL)becomeFirstResponder {
+    BOOL result = %orig;
+    if (result && [self conformsToProtocol:@protocol(UITextInput)]) {
+        KTClipboardInput = self;
+    }
+    return result;
+}
+
+%end
 
 %hook UIKeyboardDockView
 
