@@ -207,8 +207,8 @@
     self.menuCard.frame = CGRectMake(14.0, 60.0, 132.0, 54.0);
     NSArray *buttons = self.menuCard.subviews;
     if (buttons.count >= 2) {
-        buttons[0].frame = CGRectMake(8.0, 7.0, 50.0, 40.0);
-        buttons[1].frame = CGRectMake(74.0, 7.0, 50.0, 40.0);
+        ((UIView *)buttons[0]).frame = CGRectMake(8.0, 7.0, 50.0, 40.0);
+        ((UIView *)buttons[1]).frame = CGRectMake(74.0, 7.0, 50.0, 40.0);
     }
 }
 
