@@ -9,6 +9,7 @@
 @property(nonatomic,strong) UILabel *sourceLabel;
 @property(nonatomic,strong) UILabel *timeLabel;
 @property(nonatomic,strong) UILabel *dateLabel;
+@property(nonatomic,strong) UIImageView *thumbView;
 @end
 
 @implementation KTClipboardCell
@@ -47,6 +48,12 @@
         _dateLabel.textColor = UIColor.tertiaryLabelColor;
         _dateLabel.textAlignment = NSTextAlignmentRight;
         [self.contentView addSubview:_dateLabel];
+        _thumbView = [UIImageView new];
+        _thumbView.contentMode = UIViewContentModeScaleAspectFill;
+        _thumbView.layer.cornerRadius = 6.0;
+        _thumbView.clipsToBounds = YES;
+        _thumbView.hidden = YES;
+        [self.contentView addSubview:_thumbView];
     }
     return self;
 }
@@ -61,6 +68,7 @@
     CGFloat right = w - 92.0;
     self.contentLabel.frame = CGRectMake(left, 12.0, MAX(80.0, right - left), 42.0);
     self.sourceLabel.frame = CGRectMake(left, 56.0, MAX(80.0, right - left), 17.0);
+    self.thumbView.frame = CGRectMake(left, 10.0, 42.0, 42.0);
 }
 @end
 
@@ -276,7 +284,10 @@
     if (!cell) cell = [[KTClipboardCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"clip2"];
 
     cell.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)indexPath.row + 1];
-    cell.contentLabel.text = item.text ?: @"";
+    cell.thumbView.hidden = item.imageData.length == 0;
+    cell.thumbView.image = item.imageData.length ? [UIImage imageWithData:item.imageData] : nil;
+    cell.contentLabel.text = item.imageData.length ? @"图片" : (item.text ?: @"");
+    cell.contentLabel.hidden = item.imageData.length != 0;
     cell.sourceLabel.text = KTShowSource() ? (item.appName.length ? item.appName : @"未知应用") : @"";
     NSDate *date = item.recordedAt ?: NSDate.date;
     NSDateFormatter *timeFormatter = [NSDateFormatter new];

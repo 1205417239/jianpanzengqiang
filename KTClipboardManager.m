@@ -7,14 +7,16 @@ static CFStringRef const KTSharedPrefsDomain = CFSTR("com.keyboardtoolskayoko");
 
 @implementation KTClipboardItem
 - (NSDictionary *)dictionary {
-    return @{
+    NSMutableDictionary *d = [NSMutableDictionary dictionaryWithDictionary:@{
         @"text": self.text ?: @"",
         @"bundle": self.bundleIdentifier ?: @"",
         @"app": self.appName ?: @"",
         @"timestamp": @([self.recordedAt timeIntervalSince1970]),
         @"changeCount": @(self.changeCount),
         @"favorite": @(self.favorite)
-    };
+    }];
+    if (self.imageData.length) d[@"imageData"] = self.imageData;
+    return d;
 }
 + (instancetype)itemWithDictionary:(NSDictionary *)d {
     KTClipboardItem *i = [KTClipboardItem new];
@@ -24,6 +26,7 @@ static CFStringRef const KTSharedPrefsDomain = CFSTR("com.keyboardtoolskayoko");
     NSNumber *ts = [d[@"timestamp"] isKindOfClass:NSNumber.class] ? d[@"timestamp"] : nil;
     i.recordedAt = ts ? [NSDate dateWithTimeIntervalSince1970:ts.doubleValue] : NSDate.date;
     i.changeCount = [d[@"changeCount"] integerValue];
+    i.imageData = [d[@"imageData"] isKindOfClass:NSData.class] ? d[@"imageData"] : nil;
     i.favorite = [d[@"favorite"] boolValue];
     return i;
 }
@@ -83,12 +86,20 @@ static CFStringRef const KTSharedPrefsDomain = CFSTR("com.keyboardtoolskayoko");
     CFPreferencesSetAppValue((__bridge CFStringRef)KTLastChangeCountKey, (__bridge CFPropertyListRef)@(changeCount), KTSharedPrefsDomain);
     CFPreferencesAppSynchronize(KTSharedPrefsDomain);
 
-    NSString *s = pb.string;
-    if (!s.length) return;
+    NSString *s = pb.string ?: @"";
+    UIImage *image = pb.image;
+    if (!s.length && !image) return;
 
     NSString *bid = NSBundle.mainBundle.bundleIdentifier ?: @"";
     NSString *name = NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-    [self addText:s bundleIdentifier:bid appName:name];
+    [self addText:s.length ? s : @"图片" bundleIdentifier:bid appName:name];
+    if (image) {
+        KTClipboardItem *last = self.mutableItems.firstObject;
+        if (last && last.changeCount == changeCount) {
+            last.imageData = UIImagePNGRepresentation(image);
+            [self save];
+        }
+    }
 }
 
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name {

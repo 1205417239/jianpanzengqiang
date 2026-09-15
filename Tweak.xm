@@ -119,7 +119,7 @@ static void KTClipboardOpen(void) {
         KTClipboardWindow = window;
         KTClipboardController = controller;
         window.hidden = NO;
-        [window makeKeyAndVisible];
+        [window setNeedsLayout];
     });
 }
 
