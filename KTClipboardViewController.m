@@ -13,6 +13,7 @@
 @property(nonatomic,strong) UIView *grabber;
 @property(nonatomic,assign) CGFloat panStartHeight;
 @property(nonatomic,assign) CGFloat panStartY;
+@property(nonatomic,assign) BOOL panExpanded;
 
 @end
 
@@ -44,7 +45,7 @@
 
     UIPanGestureRecognizer *pan =
         [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.view addGestureRecognizer:pan];
+    [self.grabber addGestureRecognizer:pan];
 
     UIView *top = [UIView new];
     top.translatesAutoresizingMaskIntoConstraints = NO;
@@ -370,61 +371,71 @@ forRowAtIndexPath:(NSIndexPath *)indexPath {
     CGPoint translation = [pan translationInView:window];
     CGPoint velocity = [pan velocityInView:window];
     CGFloat screenHeight = CGRectGetHeight(window.bounds);
-    CGFloat baseHeight = 468.0;
-    CGFloat maxHeight = 800.0;
-    CGRect frame = self.view.frame;
+    CGFloat screenWidth = CGRectGetWidth(window.bounds);
+    const CGFloat baseHeight = 468.0;
+    const CGFloat maxHeight = 800.0;
 
     if (pan.state == UIGestureRecognizerStateBegan) {
+        CGRect frame = self.view.frame;
         self.panStartHeight = CGRectGetHeight(frame);
         self.panStartY = CGRectGetMinY(frame);
+        self.panExpanded = self.panStartHeight > baseHeight + 20.0;
         return;
     }
 
     if (pan.state == UIGestureRecognizerStateChanged) {
-        if (translation.y < 0.0) {
-            CGFloat height = MIN(maxHeight, self.panStartHeight - translation.y);
-            frame.size.height = height;
-            frame.origin.y = screenHeight - height;
-        } else if (translation.y > 0.0) {
-            frame.size.height = self.panStartHeight;
-            frame.origin.y = self.panStartY + translation.y;
-        }
+        CGFloat height = self.panStartHeight - translation.y;
+        height = MAX(baseHeight, MIN(maxHeight, height));
 
-        self.view.frame = frame;
+        if (translation.y > 0.0 && self.panStartHeight <= baseHeight + 20.0) {
+            CGRect frame = self.view.frame;
+            frame.origin.y = self.panStartY + translation.y;
+            frame.size.height = baseHeight;
+            self.view.frame = frame;
+        } else {
+            self.view.frame = CGRectMake(0.0,
+                                         screenHeight - height,
+                                         screenWidth,
+                                         height);
+        }
         return;
     }
 
-    if (pan.state == UIGestureRecognizerStateEnded ||
-        pan.state == UIGestureRecognizerStateCancelled) {
+    if (pan.state != UIGestureRecognizerStateEnded &&
+        pan.state != UIGestureRecognizerStateCancelled)
+        return;
 
-        if (translation.y > 80.0 || velocity.y > 900.0) {
-            [self closePage];
-            return;
-        }
-
-        BOOL shouldExpand =
-            self.panStartHeight <= baseHeight + 20.0 &&
-            (translation.y < -80.0 || velocity.y < -700.0);
-
-        CGFloat targetHeight = shouldExpand ? maxHeight : self.panStartHeight;
-        if (targetHeight < baseHeight)
-            targetHeight = baseHeight;
-
-        CGRect target = CGRectMake(
-            0.0,
-            screenHeight - targetHeight,
-            CGRectGetWidth(window.bounds),
-            targetHeight
-        );
-
-        [UIView animateWithDuration:0.20
-                              delay:0.0
-                            options:UIViewAnimationOptionCurveEaseOut
-                         animations:^{
-            self.view.frame = target;
-        }
-                         completion:nil];
+    if (translation.y > 80.0 || velocity.y > 900.0) {
+        [self closePage];
+        return;
     }
+
+    CGFloat currentHeight = CGRectGetHeight(self.view.frame);
+    BOOL draggingUp = translation.y < -80.0 || velocity.y < -700.0;
+    BOOL draggingDown = translation.y > 50.0 || velocity.y > 500.0;
+    CGFloat targetHeight = currentHeight;
+
+    if (draggingUp)
+        targetHeight = maxHeight;
+    else if (draggingDown && currentHeight > baseHeight + 20.0)
+        targetHeight = baseHeight;
+    else if (currentHeight <= baseHeight + 20.0)
+        targetHeight = baseHeight;
+    else
+        targetHeight = maxHeight;
+
+    CGRect target = CGRectMake(0.0,
+                               screenHeight - targetHeight,
+                               screenWidth,
+                               targetHeight);
+
+    [UIView animateWithDuration:0.20
+                          delay:0.0
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        self.view.frame = target;
+    }
+                     completion:nil];
 }
 
 - (void)closePage {

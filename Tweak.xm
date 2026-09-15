@@ -77,8 +77,9 @@ static void KTClipboardCloseAnimated(void) {
     KTClipboardPage = nil;
     KTClipboardInput = nil;
 
+    CGFloat screenHeight = CGRectGetHeight(window.bounds);
     CGRect target = page.view.frame;
-    target.origin.y = CGRectGetHeight(window.bounds) + 20.0;
+    target.origin.y = screenHeight;
 
     [UIView animateWithDuration:0.22
                           delay:0.0
@@ -90,11 +91,25 @@ static void KTClipboardCloseAnimated(void) {
         window.hidden = YES;
         window.rootViewController = nil;
 
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (input && [input respondsToSelector:@selector(becomeFirstResponder)])
+        if (input && [input respondsToSelector:@selector(becomeFirstResponder)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
                 [(UIResponder *)input becomeFirstResponder];
-        });
+            });
+        }
     }];
+}
+
+static UIWindowScene *KTForegroundWindowScene(void) {
+    for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes) {
+        if (![candidate isKindOfClass:[UIWindowScene class]])
+            continue;
+
+        UIWindowScene *scene = (UIWindowScene *)candidate;
+        if (scene.activationState == UISceneActivationStateForegroundActive)
+            return scene;
+    }
+
+    return nil;
 }
 
 static void KTClipboardOpen(void) {
@@ -106,36 +121,23 @@ static void KTClipboardOpen(void) {
         if (!input)
             return;
 
-        UIWindowScene *scene = nil;
-        for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes) {
-            if (![candidate isKindOfClass:[UIWindowScene class]])
-                continue;
-
-            UIWindowScene *ws = (UIWindowScene *)candidate;
-            if (ws.activationState == UISceneActivationStateForegroundActive) {
-                scene = ws;
-                break;
-            }
-        }
-
+        UIWindowScene *scene = KTForegroundWindowScene();
         if (!scene)
             return;
 
-        CGRect bounds = scene.coordinateSpace.bounds;
-        CGFloat screenWidth = CGRectGetWidth(bounds);
-        CGFloat screenHeight = CGRectGetHeight(bounds);
-        CGFloat panelHeight = 468.0;
+        CGRect screenBounds = scene.coordinateSpace.bounds;
+        CGFloat screenWidth = CGRectGetWidth(screenBounds);
+        CGFloat screenHeight = CGRectGetHeight(screenBounds);
+        const CGFloat panelHeight = 468.0;
 
-        if (screenWidth <= 0.0 || screenHeight <= 0.0)
+        if (screenWidth <= 0.0 || screenHeight <= panelHeight)
             return;
 
         KTClipboardInput = input;
-
-        if ([input isFirstResponder])
-            [input resignFirstResponder];
+        [input resignFirstResponder];
 
         UIWindow *window = [[UIWindow alloc] initWithWindowScene:scene];
-        window.frame = bounds;
+        window.frame = screenBounds;
         window.bounds = CGRectMake(0.0, 0.0, screenWidth, screenHeight);
         window.windowLevel = UIWindowLevelAlert + 1000.0;
         window.backgroundColor = UIColor.clearColor;
@@ -156,24 +158,19 @@ static void KTClipboardOpen(void) {
         KTClipboardWindow = window;
         KTClipboardPage = page;
 
-        page.view.frame = CGRectMake(
-            0.0,
-            screenHeight + 20.0,
-            screenWidth,
-            panelHeight
-        );
-        page.view.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        page.view.frame = CGRectMake(0.0,
+                                     screenHeight,
+                                     screenWidth,
+                                     panelHeight);
         page.view.layer.cornerRadius = 20.0;
         page.view.layer.masksToBounds = YES;
 
         [window layoutIfNeeded];
 
-        CGRect target = CGRectMake(
-            0.0,
-            screenHeight - panelHeight,
-            screenWidth,
-            panelHeight
-        );
+        CGRect target = CGRectMake(0.0,
+                                   screenHeight - panelHeight,
+                                   screenWidth,
+                                   panelHeight);
 
         [UIView animateWithDuration:0.24
                               delay:0.0
