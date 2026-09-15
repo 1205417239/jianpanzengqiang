@@ -3,7 +3,6 @@
 #import <objc/message.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import "KTClipboardViewController.h"
-#import "KTClipboardManager.h"
 
 static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
@@ -170,26 +169,6 @@ static void KTInstallToolbar(UIView *dock) {
     KTAddButton(dock, stack, @"keyboard.chevron.compact.down", @"收起", @selector(kt_dismiss:));
 }
 
-
-%hook UIPasteboard
-
-static void KTRecordPasteboardWrite(UIPasteboard *pb) {
-    if(pb != UIPasteboard.generalPasteboard) return;
-    if(!pb.string.length && !pb.image) return;
-    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-    NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-    [KTClipboardManager.sharedManager recordCurrentClipboardFromBundleIdentifier:bid appName:name];
-}
-
-- (void)setString:(NSString *)string { %orig; if(string.length) KTRecordPasteboardWrite(self); }
-- (void)setString:(NSString *)string options:(NSDictionary *)options { %orig; if(string.length) KTRecordPasteboardWrite(self); }
-- (void)setItems:(NSArray<NSDictionary<NSString *,id> *> *)items { %orig; if(items.count) KTRecordPasteboardWrite(self); }
-- (void)setItems:(NSArray<NSDictionary<NSString *,id> *> *)items options:(NSDictionary *)options { %orig; if(items.count) KTRecordPasteboardWrite(self); }
-- (void)setValue:(id)value forPasteboardType:(NSString *)pasteboardType { %orig; if(value) KTRecordPasteboardWrite(self); }
-- (void)setData:(NSData *)data forPasteboardType:(NSString *)pasteboardType { %orig; if(data.length) KTRecordPasteboardWrite(self); }
-
-%end
-
 %hook UIResponder
 
 - (BOOL)becomeFirstResponder {
@@ -255,7 +234,6 @@ static void KTRecordPasteboardWrite(UIPasteboard *pb) {
 
 %ctor {
     @autoreleasepool {
-        [KTClipboardManager.sharedManager startMonitoring];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
             CFSTR("com.keyboardtoolskayoko.reload"), NULL,

@@ -23,7 +23,7 @@ static inline BOOL KTEnabled(void) {
 
 static inline NSInteger KTHistoryLimit(void) {
     NSNumber *v = KTPrefValue(CFSTR("HistoryLimit"));
-    NSInteger n = v ? v.integerValue : 100;
+    NSInteger n = v ? v.integerValue : 50;
     if (n < 10) n = 10;
     if (n > 100) n = 100;
     return n;
