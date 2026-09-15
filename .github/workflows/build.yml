@@ -1,0 +1,59 @@
+name: Build KeyboardToolsKayoko
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Theos
+        run: |
+          git clone --recursive https://github.com/roothide/theos.git $HOME/theos
+
+      - name: 下载 iPhoneOS SDK
+        run: |
+          mkdir -p $HOME/theos/sdks
+          curl -L \
+            https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs-16.5/iPhoneOS16.5.sdk.tar.xz \
+            -o /tmp/iPhoneOS16.5.sdk.tar.xz
+
+          tar -xJf /tmp/iPhoneOS16.5.sdk.tar.xz \
+            -C $HOME/theos/sdks
+
+      - name: 安装 ldid
+        run: |
+          brew install ldid
+
+      - name: 设置 Theos
+        run: |
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+
+      - name: 编译
+        run: |
+          make clean
+          make package FINALPACKAGE=1
+
+      - name: 检查编译结果
+        run: |
+          echo "===== 编译结果 ====="
+          find . -maxdepth 4 \
+            \( -name "*.deb" -o -name "*.dylib" \) \
+            -print
+
+      - name: 上传 DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: KeyboardToolsKayoko-arm64e
+          path: |
+            packages/*.deb
