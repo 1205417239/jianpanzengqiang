@@ -1,0 +1,6 @@
+GPL-3.0-or-later
+
+This project combines the KeyboardTools concept/source with Kayoko-derived clipboard functionality.
+See the original projects:
+https://github.com/crazymind90/KeyboardTools
+https://github.com/kaethchen/Kayoko
