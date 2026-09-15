@@ -10,6 +10,7 @@
 @property(nonatomic,strong) NSArray *items;
 @property(nonatomic,strong) UIView *grabber;
 @property(nonatomic,assign) CGFloat dragStartHeight;
+@property(nonatomic,assign) BOOL dragging;
 @end
 
 @implementation KTClipboardViewController
@@ -36,6 +37,9 @@
     [self.panel addSubview:self.grabber];
     self.grabber.userInteractionEnabled = YES;
     [self.grabber addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)]];
+    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    panelPan.cancelsTouchesInView = NO;
+    [self.panel addGestureRecognizer:panelPan];
 
     UIView *top = [UIView new];
     [self.panel addSubview:top];
@@ -169,8 +173,6 @@
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
-    UIWindow *window = self.view.window;
-    if (!window) return;
     CGFloat screenWidth = CGRectGetWidth(self.view.bounds);
     CGFloat screenHeight = CGRectGetHeight(self.view.bounds);
     const CGFloat minHeight = 468.0;
@@ -180,6 +182,7 @@
 
     if (pan.state == UIGestureRecognizerStateBegan) {
         self.dragStartHeight = CGRectGetHeight(self.panel.frame);
+        self.dragging = YES;
         return;
     }
 
@@ -191,7 +194,9 @@
     }
 
     if (pan.state != UIGestureRecognizerStateEnded && pan.state != UIGestureRecognizerStateCancelled) return;
-    if (translation.y > 90.0 || velocity.y > 900.0) {
+    self.dragging = NO;
+
+    if (translation.y > 90.0 || velocity.y > 700.0) {
         [self closePage];
         return;
     }
@@ -204,7 +209,6 @@
         self.table.frame = CGRectMake(0.0, 158.0, screenWidth, targetHeight - 158.0);
     }];
 }
-
 - (void)closePage {
     if (self.closeHandler) self.closeHandler();
 }

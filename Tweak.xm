@@ -44,26 +44,29 @@ static UIResponder *KTFindFirstResponder(UIView *view) {
 }
 
 static UIResponder *KTInput(void) {
+    NSArray<UIWindow *> *windows = KTWindows();
     UIWindow *keyWindow = nil;
-    for (UIWindow *window in KTWindows()) {
-        if (window.hidden || window.alpha <= 0.01) continue;
-        if (window.windowLevel != UIWindowLevelNormal) continue;
+    for (UIWindow *window in windows) {
+        if (window.hidden || window.alpha <= 0.01 || window == KTClipboardWindow) continue;
         if (window.isKeyWindow) { keyWindow = window; break; }
-        if (!keyWindow) keyWindow = window;
     }
     if (keyWindow) {
         UIResponder *r = KTFindFirstResponder(keyWindow);
         if (r && [r conformsToProtocol:@protocol(UITextInput)]) return r;
     }
-    for (UIWindow *window in KTWindows()) {
-        if (window.hidden || window.alpha <= 0.01) continue;
-        if (window.windowLevel != UIWindowLevelNormal || window == keyWindow) continue;
+    for (UIWindow *window in windows) {
+        if (window.hidden || window.alpha <= 0.01 || window == KTClipboardWindow) continue;
+        if (window.windowLevel != UIWindowLevelNormal) continue;
+        UIResponder *r = KTFindFirstResponder(window);
+        if (r && [r conformsToProtocol:@protocol(UITextInput)]) return r;
+    }
+    for (UIWindow *window in windows) {
+        if (window.hidden || window.alpha <= 0.01 || window == KTClipboardWindow) continue;
         UIResponder *r = KTFindFirstResponder(window);
         if (r && [r conformsToProtocol:@protocol(UITextInput)]) return r;
     }
     return nil;
 }
-
 static UIWindowScene *KTActiveScene(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:[UIWindowScene class]]) continue;
