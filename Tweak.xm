@@ -170,38 +170,6 @@ static void KTInstallToolbar(UIView *dock) {
     KTAddButton(dock, stack, @"keyboard.chevron.compact.down", @"收起", @selector(kt_dismiss:));
 }
 
-
-%hook UIPasteboard
-
-- (void)setString:(NSString *)string {
-    %orig;
-    if(string.length && self == UIPasteboard.generalPasteboard) {
-        NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-        NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-        [KTClipboardManager.sharedManager recordCurrentClipboardFromBundleIdentifier:bid appName:name];
-    }
-}
-
-- (void)setItems:(NSArray<NSDictionary<NSString *,id> *> *)items {
-    %orig;
-    if(items.count && self == UIPasteboard.generalPasteboard && self.string.length) {
-        NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-        NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-        [KTClipboardManager.sharedManager recordCurrentClipboardFromBundleIdentifier:bid appName:name];
-    }
-}
-
-- (void)setValue:(id)value forPasteboardType:(NSString *)pasteboardType {
-    %orig;
-    if(value && self == UIPasteboard.generalPasteboard && self.string.length) {
-        NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-        NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-        [KTClipboardManager.sharedManager recordCurrentClipboardFromBundleIdentifier:bid appName:name];
-    }
-}
-
-%end
-
 %hook UIResponder
 
 - (BOOL)becomeFirstResponder {
