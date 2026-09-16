@@ -49,7 +49,7 @@ static NSString * const KTLockKey = @"/var/mobile/Library/Preferences/com.keyboa
 - (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
 
 - (int)lockHistory {
-    int fd=open(KTLockKey, O_CREAT|O_RDWR, 0600);
+    int fd=open(KTLockKey.UTF8String, O_CREAT|O_RDWR, 0600);
     if (fd>=0) flock(fd, LOCK_EX);
     return fd;
 }
