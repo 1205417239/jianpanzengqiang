@@ -3,19 +3,11 @@
 #import <sqlite3.h>
 
 static NSString * const KTHistoryDBPath = @"/var/mobile/Library/.KeyboardToolsKayoko/history.sqlite3";
-static NSString * const KTLegacyStoreKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.plist";
-static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
+static NSString * const KTLastPasteboard = @"KTLastPasteboard";
 
 @implementation KTClipboardItem
 - (NSDictionary *)dictionary {
-    return @{
-        @"id": @(self.rowID),
-        @"text": self.text ?: @"",
-        @"bundle": self.bundleIdentifier ?: @"",
-        @"app": self.appName ?: @"",
-        @"timestamp": @((self.recordedAt ?: NSDate.date).timeIntervalSince1970),
-        @"favorite": @(self.favorite)
-    };
+    return @{ @"id": @(self.rowID), @"text": self.text ?: @"", @"bundle": self.bundleIdentifier ?: @"", @"app": self.appName ?: @"", @"timestamp": @((self.recordedAt ?: NSDate.date).timeIntervalSince1970), @"favorite": @(self.favorite) };
 }
 + (instancetype)itemWithDictionary:(NSDictionary *)d {
     KTClipboardItem *i=[KTClipboardItem new];
@@ -32,6 +24,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 @interface KTClipboardManager ()
 @property(nonatomic,strong) NSMutableArray<KTClipboardItem *> *mutableItems;
+@property(nonatomic,copy) NSString *lastString;
 @end
 
 @implementation KTClipboardManager
@@ -42,53 +35,18 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
         _mutableItems=[NSMutableArray array];
         [self setupDatabase];
         [self reloadCache];
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
     }
     return self;
 }
-
-- (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
 
 - (void)setupDatabase {
     NSString *dir=[KTHistoryDBPath stringByDeletingLastPathComponent];
     [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
     sqlite3 *db=NULL;
-    if (sqlite3_open(KTHistoryDBPath.fileSystemRepresentation, &db)!=SQLITE_OK) { if (db) sqlite3_close(db); return; }
-    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
-    sqlite3_exec(db, "PRAGMA busy_timeout=3000;", NULL, NULL, NULL);
-    sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, bundle TEXT NOT NULL DEFAULT '', app TEXT NOT NULL DEFAULT '', timestamp REAL NOT NULL, favorite INTEGER NOT NULL DEFAULT 0);", NULL, NULL, NULL);
-    sqlite3_stmt *stmt=NULL;
-    BOOL empty=YES;
-    if (sqlite3_prepare_v2(db, "SELECT 1 FROM history LIMIT 1;", -1, &stmt, NULL)==SQLITE_OK) empty=(sqlite3_step(stmt)!=SQLITE_ROW);
-    if (stmt) sqlite3_finalize(stmt);
-    if (empty) {
-        NSArray *saved=[NSArray arrayWithContentsOfFile:KTLegacyStoreKey];
-        if ([saved isKindOfClass:NSArray.class] && saved.count) {
-            sqlite3_exec(db, "BEGIN IMMEDIATE;", NULL, NULL, NULL);
-            sqlite3_stmt *ins=NULL;
-            if (sqlite3_prepare_v2(db, "INSERT INTO history(text,bundle,app,timestamp,favorite) VALUES(?,?,?,?,?);", -1, &ins, NULL)==SQLITE_OK) {
-                for (NSDictionary *d in saved) {
-                    if (![d isKindOfClass:NSDictionary.class]) continue;
-                    NSString *text=[d[@"text"] isKindOfClass:NSString.class] ? d[@"text"] : @"";
-                    if (!text.length) continue;
-                    NSString *bundle=[d[@"bundle"] isKindOfClass:NSString.class] ? d[@"bundle"] : @"";
-                    NSString *app=[d[@"app"] isKindOfClass:NSString.class] ? d[@"app"] : @"";
-                    double ts=[d[@"timestamp"] respondsToSelector:@selector(doubleValue)] ? [d[@"timestamp"] doubleValue] : NSDate.date.timeIntervalSince1970;
-                    int fav=[d[@"favorite"] boolValue] ? 1 : 0;
-                    sqlite3_bind_text(ins,1,text.UTF8String,-1,SQLITE_TRANSIENT);
-                    sqlite3_bind_text(ins,2,bundle.UTF8String,-1,SQLITE_TRANSIENT);
-                    sqlite3_bind_text(ins,3,app.UTF8String,-1,SQLITE_TRANSIENT);
-                    sqlite3_bind_double(ins,4,ts);
-                    sqlite3_bind_int(ins,5,fav);
-                    sqlite3_step(ins);
-                    sqlite3_reset(ins);
-                    sqlite3_clear_bindings(ins);
-                }
-                sqlite3_finalize(ins);
-            }
-            sqlite3_exec(db, "COMMIT;", NULL, NULL, NULL);
-        }
-    }
+    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation,&db,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE,NULL)!=SQLITE_OK) { if(db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db,5000);
+    sqlite3_exec(db,"PRAGMA journal_mode=WAL;",NULL,NULL,NULL);
+    sqlite3_exec(db,"CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, bundle TEXT NOT NULL DEFAULT '', app TEXT NOT NULL DEFAULT '', timestamp REAL NOT NULL, favorite INTEGER NOT NULL DEFAULT 0);",NULL,NULL,NULL);
     sqlite3_close(db);
 }
 
@@ -99,12 +57,12 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 - (NSArray *)readItems:(BOOL)favoritesOnly {
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation, &db, SQLITE_OPEN_READONLY, NULL)!=SQLITE_OK) { if (db) sqlite3_close(db); return @[]; }
-    sqlite3_busy_timeout(db,3000);
-    NSString *sql=favoritesOnly ? @"SELECT id,text,bundle,app,timestamp,favorite FROM history WHERE favorite=1 ORDER BY id DESC;" : @"SELECT id,text,bundle,app,timestamp,favorite FROM history ORDER BY id DESC;";
+    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation,&db,SQLITE_OPEN_READONLY,NULL)!=SQLITE_OK) { if(db) sqlite3_close(db); return @[]; }
+    sqlite3_busy_timeout(db,5000);
+    const char *sql=favoritesOnly ? "SELECT id,text,bundle,app,timestamp,favorite FROM history WHERE favorite=1 ORDER BY id DESC;" : "SELECT id,text,bundle,app,timestamp,favorite FROM history ORDER BY id DESC;";
     sqlite3_stmt *stmt=NULL;
     NSMutableArray *result=[NSMutableArray array];
-    if (sqlite3_prepare_v2(db, sql.UTF8String, -1, &stmt, NULL)==SQLITE_OK) {
+    if (sqlite3_prepare_v2(db,sql,-1,&stmt,NULL)==SQLITE_OK) {
         while (sqlite3_step(stmt)==SQLITE_ROW) {
             KTClipboardItem *i=[KTClipboardItem new];
             i.rowID=sqlite3_column_int64(stmt,0);
@@ -125,69 +83,43 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 }
 
 - (void)startMonitoring {
-    if (!KTEnabled() || !KTRecordClipboard()) return;
-    [self addCurrentClipboard];
-}
-
-- (void)pasteboardChanged:(NSNotification *)note {
-    if (!KTEnabled() || !KTRecordClipboard()) return;
-    UIPasteboard *pb=UIPasteboard.generalPasteboard;
-    NSInteger change=pb.changeCount;
-    NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults];
-    NSNumber *last=[defaults objectForKey:KTLastPasteboardChange];
-    if (last && last.integerValue == change) return;
-    [defaults setObject:@(change) forKey:KTLastPasteboardChange];
-
-    NSString *text=pb.string;
-    if (!text.length) return;
-
-    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-    NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-    NSDate *recordedAt=NSDate.date;
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:recordedAt];
-    });
+    if (KTEnabled() && KTRecordClipboard()) [self addCurrentClipboard];
 }
 
 - (void)addCurrentClipboard {
     if (!KTEnabled() || !KTRecordClipboard()) return;
     UIPasteboard *pb=UIPasteboard.generalPasteboard;
-    NSInteger change=pb.changeCount;
-    NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults];
-    NSNumber *last=[defaults objectForKey:KTLastPasteboardChange];
-    if (last && last.integerValue == change) return;
-    [defaults setObject:@(change) forKey:KTLastPasteboardChange];
-
-    NSString *text=pb.string;
-    if (!text.length) return;
-    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-    NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-    [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:NSDate.date];
-}
-
-- (void)addCapturedText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name recordedAt:(NSDate *)recordedAt {
-    if (!text.length) return;
-    sqlite3 *db=NULL;
-    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation, &db, SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK) { if (db) sqlite3_close(db); return; }
-    sqlite3_busy_timeout(db,3000);
-    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
-    sqlite3_stmt *stmt=NULL;
-    if (sqlite3_prepare_v2(db, "INSERT INTO history(text,bundle,app,timestamp,favorite) VALUES(?,?,?,?,0);", -1, &stmt, NULL)==SQLITE_OK) {
-        sqlite3_bind_text(stmt,1,text.UTF8String,-1,SQLITE_TRANSIENT);
-        sqlite3_bind_text(stmt,2,(bid ?: @"").UTF8String,-1,SQLITE_TRANSIENT);
-        sqlite3_bind_text(stmt,3,(name ?: @"").UTF8String,-1,SQLITE_TRANSIENT);
-        sqlite3_bind_double(stmt,4,(recordedAt ?: NSDate.date).timeIntervalSince1970);
-        sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
+    NSString *s=pb.string;
+    if (s.length) {
+        NSString *last=[[NSUserDefaults standardUserDefaults] stringForKey:KTLastPasteboard];
+        if (![last isEqualToString:s]) {
+            [[NSUserDefaults standardUserDefaults] setObject:s forKey:KTLastPasteboard];
+            NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
+            NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
+            [self addText:s bundleIdentifier:bid appName:name];
+        }
     }
-    sqlite3_exec(db, "DELETE FROM history WHERE favorite=0 AND id NOT IN (SELECT id FROM history WHERE favorite=0 ORDER BY id DESC LIMIT 50);", NULL, NULL, NULL);
-    sqlite3_close(db);
-    [self reloadCache];
 }
 
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name {
-    [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:NSDate.date];
+    if (!text.length) return;
+    sqlite3 *db=NULL;
+    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation,&db,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE,NULL)!=SQLITE_OK) { if(db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db,5000);
+    sqlite3_exec(db,"BEGIN IMMEDIATE;",NULL,NULL,NULL);
+    sqlite3_stmt *stmt=NULL;
+    if (sqlite3_prepare_v2(db,"INSERT INTO history(text,bundle,app,timestamp,favorite) VALUES(?,?,?,?,0);",-1,&stmt,NULL)==SQLITE_OK) {
+        sqlite3_bind_text(stmt,1,text.UTF8String,-1,SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt,2,(bid ?: @"").UTF8String,-1,SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt,3,(name ?: @"").UTF8String,-1,SQLITE_TRANSIENT);
+        sqlite3_bind_double(stmt,4,NSDate.date.timeIntervalSince1970);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_exec(db,"COMMIT;",NULL,NULL,NULL);
+    sqlite3_exec(db,"DELETE FROM history WHERE favorite=0 AND id NOT IN (SELECT id FROM history WHERE favorite=0 ORDER BY id DESC LIMIT 50);",NULL,NULL,NULL);
+    sqlite3_close(db);
+    [self reloadCache];
 }
 
 - (NSArray *)items {
@@ -197,19 +129,16 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     return fresh;
 }
 
-- (NSArray *)favorites {
-    NSArray *fresh=[self readItems:YES];
-    return fresh;
-}
+- (NSArray *)favorites { return [self readItems:YES]; }
 
 - (void)setFavorite:(BOOL)favorite forItem:(KTClipboardItem *)item {
     if (!item || item.rowID<=0) return;
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation, &db, SQLITE_OPEN_READWRITE, NULL)!=SQLITE_OK) { if (db) sqlite3_close(db); return; }
-    sqlite3_busy_timeout(db,3000);
+    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK) { if(db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db,5000);
     sqlite3_stmt *stmt=NULL;
-    if (sqlite3_prepare_v2(db, "UPDATE history SET favorite=? WHERE id=?;", -1, &stmt, NULL)==SQLITE_OK) {
-        sqlite3_bind_int(stmt,1,favorite ? 1 : 0);
+    if (sqlite3_prepare_v2(db,"UPDATE history SET favorite=? WHERE id=?;",-1,&stmt,NULL)==SQLITE_OK) {
+        sqlite3_bind_int(stmt,1,favorite?1:0);
         sqlite3_bind_int64(stmt,2,item.rowID);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
@@ -221,10 +150,10 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 - (void)removeItem:(KTClipboardItem *)item {
     if (!item || item.rowID<=0) return;
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation, &db, SQLITE_OPEN_READWRITE, NULL)!=SQLITE_OK) { if (db) sqlite3_close(db); return; }
-    sqlite3_busy_timeout(db,3000);
+    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK) { if(db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db,5000);
     sqlite3_stmt *stmt=NULL;
-    if (sqlite3_prepare_v2(db, "DELETE FROM history WHERE id=?;", -1, &stmt, NULL)==SQLITE_OK) {
+    if (sqlite3_prepare_v2(db,"DELETE FROM history WHERE id=?;",-1,&stmt,NULL)==SQLITE_OK) {
         sqlite3_bind_int64(stmt,1,item.rowID);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
@@ -235,9 +164,9 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 - (void)clearClipboardHistory {
     sqlite3 *db=NULL;
-    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation, &db, SQLITE_OPEN_READWRITE, NULL)!=SQLITE_OK) { if (db) sqlite3_close(db); return; }
-    sqlite3_busy_timeout(db,3000);
-    sqlite3_exec(db, "DELETE FROM history WHERE favorite=0;", NULL, NULL, NULL);
+    if (sqlite3_open_v2(KTHistoryDBPath.fileSystemRepresentation,&db,SQLITE_OPEN_READWRITE,NULL)!=SQLITE_OK) { if(db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db,5000);
+    sqlite3_exec(db,"DELETE FROM history WHERE favorite=0;",NULL,NULL,NULL);
     sqlite3_close(db);
     [self reloadCache];
 }

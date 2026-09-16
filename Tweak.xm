@@ -235,7 +235,6 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
-        [KTClipboardManager.sharedManager startMonitoring];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
             CFSTR("com.keyboardtoolskayoko.reload"), NULL,
