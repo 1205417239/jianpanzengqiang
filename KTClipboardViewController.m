@@ -38,14 +38,14 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat h = CGRectGetHeight(self.contentView.bounds);
-    self.numberLabel.frame = CGRectMake(8.0, 0.0, 28.0, h);
-    CGFloat right = CGRectGetWidth(self.contentView.bounds) - 10.0;
-    self.timeLabel.frame = CGRectMake(right - 48.0, 5.0, 48.0, 16.0);
-    self.dateLabel.frame = CGRectMake(right - 62.0, 22.0, 62.0, 14.0);
-    CGFloat textX = 42.0;
-    CGFloat textRight = right - 68.0;
+    self.numberLabel.frame = CGRectMake(10.0, 0.0, 34.0, h);
+    CGFloat right = CGRectGetWidth(self.contentView.bounds) - 14.0;
+    self.timeLabel.frame = CGRectMake(right - 62.0, 5.0, 62.0, 16.0);
+    self.dateLabel.frame = CGRectMake(right - 76.0, 21.0, 76.0, 15.0);
+    CGFloat textX = 52.0;
+    CGFloat textRight = right - 88.0;
     self.textLabel.frame = CGRectMake(textX, 4.0, MAX(40.0, textRight - textX), 18.0);
-    self.detailTextLabel.frame = CGRectMake(textX, 22.0, MAX(40.0, textRight - textX), 16.0);
+    self.detailTextLabel.frame = CGRectMake(textX, 22.0, MAX(40.0, textRight - textX), 17.0);
 }
 @end
 
@@ -160,6 +160,7 @@
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     [self layoutPanel];
+    [KTClipboardManager.sharedManager reloadFromDisk];
     [self reload];
     CGRect target = self.panel.frame;
     CGFloat h = CGRectGetHeight(self.view.bounds);
@@ -275,11 +276,13 @@
     cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
     cell.detailTextLabel.numberOfLines = 1;
     cell.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)indexPath.row + 1];
-    cell.textLabel.text = item.appName.length ? item.appName : @"未知应用";
-    NSString *preview = item.text ?: @"";
-    preview = [[preview componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] componentsJoinedByString:@" "];
-    if (preview.length > 32) preview = [[preview substringToIndex:32] stringByAppendingString:@"…"];
-    cell.detailTextLabel.text = preview;
+    if (KTShowSource()) {
+        cell.textLabel.text = item.appName.length ? item.appName : @"未知应用";
+        cell.detailTextLabel.text = item.text ?: @"";
+    } else {
+        cell.textLabel.text = item.text ?: @"";
+        cell.detailTextLabel.text = @"";
+    }
     NSDate *date = item.recordedAt ?: NSDate.date;
     NSDateFormatter *timeFormatter = [NSDateFormatter new];
     timeFormatter.dateFormat = @"HH:mm";

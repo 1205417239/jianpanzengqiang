@@ -15,6 +15,7 @@
 - (void)startMonitoring;
 - (void)addCurrentClipboard;
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name;
+- (void)reloadFromDisk;
 - (NSArray *)items;
 - (NSArray *)favorites;
 - (void)setFavorite:(BOOL)favorite forItem:(KTClipboardItem *)item;
