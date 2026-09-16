@@ -1,7 +1,6 @@
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
 #import "KTSettings.h"
-#import "KTHistoryAggregator.h"
 #import <UIKit/UIKit.h>
 
 @interface KTClipboardCell : UITableViewCell
@@ -230,7 +229,7 @@
 }
 
 - (void)reload {
-    self.items = self.segment.selectedSegmentIndex == 1 ? [KTHistoryAggregator favorites] : [KTHistoryAggregator items];
+    self.items = self.segment.selectedSegmentIndex == 1 ? KTClipboardManager.sharedManager.favorites : KTClipboardManager.sharedManager.items;
     [self.table reloadData];
 }
 
@@ -306,7 +305,7 @@
         BOOL value = !item.favorite;
         [KTClipboardManager.sharedManager setFavorite:value forItem:item];
         completionHandler(YES);
-        dispatch_async(dispatch_get_main_queue(), ^{ [self reload]; });
+        [self reload];
     }];
     favorite.image = [UIImage systemImageNamed:item.favorite ? @"star.slash" : @"star"];
     favorite.backgroundColor = UIColor.systemOrangeColor;
@@ -314,7 +313,7 @@
     UIContextualAction *delete = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:@"" handler:^(UIContextualAction *action, UIView *sourceView, void (^completionHandler)(BOOL)) {
         [KTClipboardManager.sharedManager removeItem:item];
         completionHandler(YES);
-        dispatch_async(dispatch_get_main_queue(), ^{ [self reload]; });
+        [self reload];
     }];
     delete.image = [UIImage systemImageNamed:@"trash"];
     return @[delete, favorite];

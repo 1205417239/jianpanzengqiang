@@ -1,13 +1,12 @@
 #import <UIKit/UIKit.h>
-#include <sqlite3.h>
 
 @interface KTClipboardItem : NSObject
+@property(nonatomic,assign) NSInteger rowID;
 @property(nonatomic,copy) NSString *text;
 @property(nonatomic,copy) NSString *bundleIdentifier;
 @property(nonatomic,copy) NSString *appName;
 @property(nonatomic,strong) NSDate *recordedAt;
 @property(nonatomic,assign) BOOL favorite;
-@property(nonatomic,assign) sqlite3_int64 databaseID;
 - (NSDictionary *)dictionary;
 + (instancetype)itemWithDictionary:(NSDictionary *)d;
 @end
