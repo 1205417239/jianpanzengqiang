@@ -27,7 +27,7 @@
 
     self.panel = [UIView new];
     self.panel.backgroundColor = UIColor.systemBackgroundColor;
-    self.panel.layer.cornerRadius = 20.0;
+    self.panel.layer.cornerRadius = 16.0;
     self.panel.layer.masksToBounds = YES;
     [self.view addSubview:self.panel];
 
@@ -87,7 +87,7 @@
     [self reload];
     CGRect target = self.panel.frame;
     CGFloat h = CGRectGetHeight(self.view.bounds);
-    self.panel.frame = CGRectMake(0.0, h, CGRectGetWidth(self.view.bounds), 468.0);
+    self.panel.frame = CGRectMake(0.0, h, CGRectGetWidth(self.view.bounds), 420.0);
     [UIView animateWithDuration:0.22 animations:^{
         self.panel.frame = target;
     }];
@@ -102,7 +102,7 @@
     CGFloat width = CGRectGetWidth(self.view.bounds);
     CGFloat height = CGRectGetHeight(self.view.bounds);
     if (width <= 0.0 || height <= 0.0) return;
-    CGFloat panelHeight = 468.0;
+    CGFloat panelHeight = 420.0;
     self.panel.frame = CGRectMake(0.0, height - panelHeight, width, panelHeight);
 
     self.grabber.frame = CGRectMake((width - 42.0) / 2.0, 7.0, 42.0, 6.0);
@@ -175,8 +175,7 @@
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
     CGFloat screenWidth = CGRectGetWidth(self.view.bounds);
     CGFloat screenHeight = CGRectGetHeight(self.view.bounds);
-    const CGFloat minHeight = 468.0;
-    const CGFloat maxHeight = 800.0;
+    const CGFloat baseHeight = 420.0;
     CGPoint translation = [pan translationInView:self.view];
     CGPoint velocity = [pan velocityInView:self.view];
 
@@ -187,7 +186,8 @@
     }
 
     if (pan.state == UIGestureRecognizerStateChanged) {
-        CGFloat height = MAX(minHeight, MIN(maxHeight, self.dragStartHeight - translation.y));
+        CGFloat height = self.dragStartHeight - translation.y;
+        height = MAX(0.0, MIN(baseHeight, height));
         self.panel.frame = CGRectMake(0.0, screenHeight - height, screenWidth, height);
         self.table.frame = CGRectMake(0.0, 158.0, screenWidth, MAX(0.0, height - 158.0));
         return;
@@ -196,19 +196,18 @@
     if (pan.state != UIGestureRecognizerStateEnded && pan.state != UIGestureRecognizerStateCancelled) return;
     self.dragging = NO;
 
-    if (translation.y > 90.0 || velocity.y > 700.0) {
+    if (translation.y > 100.0 || velocity.y > 700.0) {
         [self closePage];
         return;
     }
 
-    CGFloat currentHeight = CGRectGetHeight(self.panel.frame);
-    CGFloat targetHeight = (translation.y < -70.0 || velocity.y < -700.0 || currentHeight > minHeight + 20.0) ? maxHeight : minHeight;
-    CGRect target = CGRectMake(0.0, screenHeight - targetHeight, screenWidth, targetHeight);
-    [UIView animateWithDuration:0.20 animations:^{
+    CGRect target = CGRectMake(0.0, screenHeight - baseHeight, screenWidth, baseHeight);
+    [UIView animateWithDuration:0.32 delay:0.0 usingSpringWithDamping:0.88 initialSpringVelocity:0.0 options:UIViewAnimationOptionCurveEaseOut animations:^{
         self.panel.frame = target;
-        self.table.frame = CGRectMake(0.0, 158.0, screenWidth, targetHeight - 158.0);
-    }];
+        self.table.frame = CGRectMake(0.0, 158.0, screenWidth, baseHeight - 158.0);
+    } completion:nil];
 }
+
 - (void)closePage {
     if (self.closeHandler) self.closeHandler();
 }
