@@ -38,15 +38,17 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat h = CGRectGetHeight(self.contentView.bounds);
-    self.numberLabel.frame = CGRectMake(10.0, 0.0, 34.0, h);
-    CGFloat right = CGRectGetWidth(self.contentView.bounds) - 14.0;
-    self.timeLabel.frame = CGRectMake(right - 62.0, 15.0, 62.0, 20.0);
-    self.dateLabel.frame = CGRectMake(right - 76.0, 37.0, 76.0, 18.0);
-    CGFloat textX = 52.0;
-    CGFloat textRight = right - 88.0;
-    self.textLabel.frame = CGRectMake(textX, 12.0, MAX(40.0, textRight - textX), h - 24.0);
-    self.detailTextLabel.frame = CGRectMake(textX, 48.0, MAX(40.0, textRight - textX), 22.0);
+    self.numberLabel.frame = CGRectMake(10.0, 0.0, 30.0, h);
+    CGFloat right = CGRectGetWidth(self.contentView.bounds) - 12.0;
+    self.timeLabel.frame = CGRectMake(right - 58.0, 2.0, 58.0, 17.0);
+    self.dateLabel.frame = CGRectMake(right - 72.0, 20.0, 72.0, 16.0);
+    CGFloat textX = 48.0;
+    CGFloat textRight = right - 82.0;
+    self.textLabel.frame = CGRectMake(textX, 2.0, MAX(40.0, textRight - textX), h - 4.0);
+    self.detailTextLabel.frame = CGRectMake(textX, 22.0, MAX(40.0, textRight - textX), 16.0);
 }
+- (BOOL)canBecomeFirstResponder { return NO; }
+- (BOOL)canPerformAction:(SEL)action withSender:(id)sender { return NO; }
 @end
 
 @interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource>
@@ -262,7 +264,7 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.items.count; }
-- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 82.0; }
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 42.0; }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.row >= self.items.count) return [UITableViewCell new];
