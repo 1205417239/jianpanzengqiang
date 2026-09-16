@@ -11,9 +11,7 @@ static NSString * const KTLastChangeKey = @"lastChangeCount";
 
 @implementation KTClipboardItem
 - (NSDictionary *)dictionary {
-    NSMutableDictionary *d=[NSMutableDictionary dictionaryWithDictionary:@{ @"text": self.text ?: @"", @"bundle": self.bundleIdentifier ?: @"", @"app": self.appName ?: @"", @"timestamp": @((self.recordedAt ?: NSDate.date).timeIntervalSince1970), @"favorite": @(self.favorite) }];
-    if(self.imageData.length) d[@"imageData"]=self.imageData;
-    return d;
+    return @{ @"text": self.text ?: @"", @"bundle": self.bundleIdentifier ?: @"", @"app": self.appName ?: @"", @"timestamp": @((self.recordedAt ?: NSDate.date).timeIntervalSince1970), @"favorite": @(self.favorite) };
 }
 + (instancetype)itemWithDictionary:(NSDictionary *)d {
     KTClipboardItem *i=[KTClipboardItem new];
@@ -22,7 +20,6 @@ static NSString * const KTLastChangeKey = @"lastChangeCount";
     i.appName=[d[@"app"] isKindOfClass:NSString.class] ? d[@"app"] : @"";
     NSNumber *ts=[d[@"timestamp"] isKindOfClass:NSNumber.class] ? d[@"timestamp"] : nil;
     i.recordedAt=ts ? [NSDate dateWithTimeIntervalSince1970:ts.doubleValue] : NSDate.date;
-    i.imageData=[d[@"imageData"] isKindOfClass:NSData.class] ? d[@"imageData"] : nil;
     i.favorite=[d[@"favorite"] boolValue];
     return i;
 }
@@ -38,12 +35,13 @@ static NSString * const KTLastChangeKey = @"lastChangeCount";
     if ((self=[super init])) {
         _mutableItems=[NSMutableArray array];
         [self loadItems];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
     }
     return self;
 }
-- (void)dealloc {}
+- (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
 - (int)lockFile {
-    int fd=open(KTLockKey.UTF8String,O_CREAT|O_RDWR,0600);
+    int fd=open(KTLockKey,O_CREAT|O_RDWR,0600);
     if(fd>=0) flock(fd,LOCK_EX);
     return fd;
 }
@@ -54,35 +52,28 @@ static NSString * const KTLastChangeKey = @"lastChangeCount";
     for(NSDictionary *d in saved) if([d isKindOfClass:NSDictionary.class]) [_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
 }
 - (void)saveUnlocked {
-    [[NSFileManager defaultManager] createDirectoryAtPath:@"/var/mobile/Library/Preferences" withIntermediateDirectories:YES attributes:nil error:nil];
     NSMutableArray *a=[NSMutableArray arrayWithCapacity:self.mutableItems.count];
     for(KTClipboardItem *i in self.mutableItems) [a addObject:i.dictionary];
     [a writeToFile:KTStoreKey atomically:YES];
 }
 - (void)save { int fd=[self lockFile]; [self saveUnlocked]; [self unlockFile:fd]; }
-- (void)startMonitoring {}
-- (void)pasteboardChanged:(NSNotification *)note {}
+- (void)startMonitoring { if(KTEnabled() && KTRecordClipboard()) [self addCurrentClipboard]; }
+- (void)pasteboardChanged:(NSNotification *)note { dispatch_async(dispatch_get_main_queue(), ^{ [self addCurrentClipboard]; }); }
 - (void)addCurrentClipboard {
     if(!KTEnabled() || !KTRecordClipboard()) return;
-    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
-    NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
-    [self recordCurrentClipboardFromBundleIdentifier:bid appName:name];
-}
-- (void)recordCurrentClipboardFromBundleIdentifier:(NSString *)bid appName:(NSString *)name {
-    if(!KTEnabled() || !KTRecordClipboard()) return;
     UIPasteboard *pb=UIPasteboard.generalPasteboard;
-    NSString *s=pb.string ?: @"";
-    UIImage *image=pb.image;
-    if(!s.length && !image) return;
     NSInteger change=pb.changeCount;
+    NSString *s=pb.string;
+    if(!s.length) return;
     int fd=[self lockFile];
     NSDictionary *state=[NSDictionary dictionaryWithContentsOfFile:KTStateKey];
     NSInteger last=[state[KTLastChangeKey] integerValue];
     if(last==change){ [self unlockFile:fd]; return; }
     [self loadItems];
+    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
+    NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
     KTClipboardItem *i=[KTClipboardItem new];
-    i.text=s.length ? s : @"图片"; i.bundleIdentifier=bid ?: @""; i.appName=name ?: @""; i.recordedAt=NSDate.date; i.favorite=NO;
-    if(image) i.imageData=UIImagePNGRepresentation(image);
+    i.text=s; i.bundleIdentifier=bid; i.appName=name; i.recordedAt=NSDate.date; i.favorite=NO;
     [self.mutableItems insertObject:i atIndex:0];
     while(self.mutableItems.count>KTHistoryLimit()){
         NSUInteger removeIndex=NSNotFound;
@@ -109,7 +100,7 @@ static NSString * const KTLastChangeKey = @"lastChangeCount";
     [self saveUnlocked];
     [self unlockFile:fd];
 }
-- (NSArray *)items { int fd=[self lockFile]; [self loadItems]; NSArray *a=[self.mutableItems copy]; [self unlockFile:fd]; return a; }
+- (NSArray *)items { if(KTEnabled()&&KTRecordClipboard()) [self addCurrentClipboard]; int fd=[self lockFile]; [self loadItems]; NSArray *a=[self.mutableItems copy]; [self unlockFile:fd]; return a; }
 - (NSArray *)favorites { int fd=[self lockFile]; [self loadItems]; NSMutableArray *a=[NSMutableArray array]; for(KTClipboardItem *i in self.mutableItems) if(i.favorite) [a addObject:i]; [self unlockFile:fd]; return a; }
 - (void)setFavorite:(BOOL)favorite forItem:(KTClipboardItem *)item { if(!item)return; int fd=[self lockFile]; [self loadItems]; for(KTClipboardItem *i in self.mutableItems) if(i==item || ([i.text isEqualToString:item.text] && fabs(i.recordedAt.timeIntervalSince1970-item.recordedAt.timeIntervalSince1970)<0.001)){ i.favorite=favorite; break; } [self saveUnlocked]; [self unlockFile:fd]; }
 - (void)removeItem:(KTClipboardItem *)item { if(!item)return; int fd=[self lockFile]; [self loadItems]; NSUInteger idx=[self.mutableItems indexOfObject:item]; if(idx==NSNotFound){ for(NSUInteger n=0;n<self.mutableItems.count;n++){ KTClipboardItem *i=self.mutableItems[n]; if([i.text isEqualToString:item.text] && fabs(i.recordedAt.timeIntervalSince1970-item.recordedAt.timeIntervalSince1970)<0.001){ idx=n; break; } } } if(idx!=NSNotFound)[self.mutableItems removeObjectAtIndex:idx]; [self saveUnlocked]; [self unlockFile:fd]; }
