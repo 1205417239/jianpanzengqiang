@@ -38,20 +38,18 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat h = CGRectGetHeight(self.contentView.bounds);
-    self.numberLabel.frame = CGRectMake(10.0, 0.0, 30.0, h);
-    CGFloat right = CGRectGetWidth(self.contentView.bounds) - 12.0;
-    self.timeLabel.frame = CGRectMake(right - 58.0, 2.0, 58.0, 17.0);
-    self.dateLabel.frame = CGRectMake(right - 72.0, 20.0, 72.0, 16.0);
-    CGFloat textX = 48.0;
-    CGFloat textRight = right - 82.0;
-    self.textLabel.frame = CGRectMake(textX, 2.0, MAX(40.0, textRight - textX), h - 4.0);
-    self.detailTextLabel.frame = CGRectMake(textX, 22.0, MAX(40.0, textRight - textX), 16.0);
+    self.numberLabel.frame = CGRectMake(10.0, 0.0, 34.0, h);
+    CGFloat right = CGRectGetWidth(self.contentView.bounds) - 14.0;
+    self.timeLabel.frame = CGRectMake(right - 62.0, 15.0, 62.0, 20.0);
+    self.dateLabel.frame = CGRectMake(right - 76.0, 37.0, 76.0, 18.0);
+    CGFloat textX = 52.0;
+    CGFloat textRight = right - 88.0;
+    self.textLabel.frame = CGRectMake(textX, 12.0, MAX(40.0, textRight - textX), h - 24.0);
+    self.detailTextLabel.frame = CGRectMake(textX, 48.0, MAX(40.0, textRight - textX), 22.0);
 }
-- (BOOL)canBecomeFirstResponder { return NO; }
-- (BOOL)canPerformAction:(SEL)action withSender:(id)sender { return NO; }
 @end
 
-@interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource, UIGestureRecognizerDelegate>
+@interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource>
 @property(nonatomic,strong) id<UITextInput> input;
 @property(nonatomic,strong) UISegmentedControl *segment;
 @property(nonatomic,strong) UIButton *clipboardTab;
@@ -67,26 +65,6 @@
 @property(nonatomic,assign) CGFloat dragStartHeight;
 @property(nonatomic,assign) BOOL dragging;
 @end
-
-static NSDateFormatter *KTClipboardTimeFormatter(void) {
-    static NSDateFormatter *f;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        f = [NSDateFormatter new];
-        f.dateFormat = @"HH:mm";
-    });
-    return f;
-}
-
-static NSDateFormatter *KTClipboardDateFormatter(void) {
-    static NSDateFormatter *f;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        f = [NSDateFormatter new];
-        f.dateFormat = @"MM/dd";
-    });
-    return f;
-}
 
 @implementation KTClipboardViewController
 
@@ -114,7 +92,6 @@ static NSDateFormatter *KTClipboardDateFormatter(void) {
     [self.grabber addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)]];
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     panelPan.cancelsTouchesInView = NO;
-    panelPan.delegate = self;
     [self.panel addGestureRecognizer:panelPan];
 
     self.menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -285,7 +262,7 @@ static NSDateFormatter *KTClipboardDateFormatter(void) {
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.items.count; }
-- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 42.0; }
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath { return 82.0; }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.row >= self.items.count) return [UITableViewCell new];
@@ -298,10 +275,15 @@ static NSDateFormatter *KTClipboardDateFormatter(void) {
     cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
     cell.detailTextLabel.numberOfLines = 1;
     cell.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)indexPath.row + 1];
-    cell.textLabel.text = item.text ?: @"";
-    cell.detailTextLabel.text = KTShowSource() ? (item.appName.length ? item.appName : @"未知应用") : @"";
-    cell.timeLabel.text = item.date ? [KTClipboardTimeFormatter() stringFromDate:item.date] : @"";
-    cell.dateLabel.text = item.date ? [KTClipboardDateFormatter() stringFromDate:item.date] : @"";
+    if (KTShowSource()) {
+        cell.textLabel.text = item.appName.length ? item.appName : @"未知应用";
+        cell.detailTextLabel.text = item.text ?: @"";
+    } else {
+        cell.textLabel.text = item.text ?: @"";
+        cell.detailTextLabel.text = @"";
+    }
+    cell.timeLabel.text = @"";
+    cell.dateLabel.text = @"";
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.imageView.image = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleGray;
@@ -335,24 +317,6 @@ static NSDateFormatter *KTClipboardDateFormatter(void) {
     }];
     delete.image = [UIImage systemImageNamed:@"trash"];
     return @[delete, favorite];
-}
-
-- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
-    if ([gestureRecognizer isKindOfClass:UIPanGestureRecognizer.class]) {
-        UIView *v = touch.view;
-        while (v) {
-            if (v == self.table) return NO;
-            v = v.superview;
-        }
-    }
-    return YES;
-}
-
-- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
-    if (![gestureRecognizer isKindOfClass:UIPanGestureRecognizer.class]) return YES;
-    UIPanGestureRecognizer *pan = (UIPanGestureRecognizer *)gestureRecognizer;
-    CGPoint v = [pan velocityInView:self.view];
-    return fabs(v.y) >= fabs(v.x);
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {

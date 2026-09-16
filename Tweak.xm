@@ -3,6 +3,7 @@
 #import <objc/message.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import "KTClipboardViewController.h"
+#import "KTClipboardManager.h"
 
 static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
