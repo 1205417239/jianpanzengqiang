@@ -3,6 +3,7 @@
 #import <objc/message.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import "KTClipboardViewController.h"
+#import "KTClipboardManager.h"
 
 static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
@@ -234,6 +235,7 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
+        [KTClipboardManager sharedManager];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
             CFSTR("com.keyboardtoolskayoko.reload"), NULL,

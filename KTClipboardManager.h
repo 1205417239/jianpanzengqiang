@@ -6,6 +6,7 @@
 @property(nonatomic, copy) NSString *bundleIdentifier;
 @property(nonatomic, copy) NSString *appName;
 @property(nonatomic, assign) BOOL favorite;
+@property(nonatomic, strong) NSDate *date;
 @end
 
 @interface KTClipboardManager : NSObject

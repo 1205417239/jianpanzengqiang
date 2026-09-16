@@ -51,7 +51,7 @@
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender { return NO; }
 @end
 
-@interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource>
+@interface KTClipboardViewController () <UITableViewDelegate, UITableViewDataSource, UIGestureRecognizerDelegate>
 @property(nonatomic,strong) id<UITextInput> input;
 @property(nonatomic,strong) UISegmentedControl *segment;
 @property(nonatomic,strong) UIButton *clipboardTab;
@@ -67,6 +67,26 @@
 @property(nonatomic,assign) CGFloat dragStartHeight;
 @property(nonatomic,assign) BOOL dragging;
 @end
+
+static NSDateFormatter *KTClipboardTimeFormatter(void) {
+    static NSDateFormatter *f;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        f = [NSDateFormatter new];
+        f.dateFormat = @"HH:mm";
+    });
+    return f;
+}
+
+static NSDateFormatter *KTClipboardDateFormatter(void) {
+    static NSDateFormatter *f;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        f = [NSDateFormatter new];
+        f.dateFormat = @"MM/dd";
+    });
+    return f;
+}
 
 @implementation KTClipboardViewController
 
@@ -94,6 +114,7 @@
     [self.grabber addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)]];
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     panelPan.cancelsTouchesInView = NO;
+    panelPan.delegate = self;
     [self.panel addGestureRecognizer:panelPan];
 
     self.menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -277,15 +298,10 @@
     cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
     cell.detailTextLabel.numberOfLines = 1;
     cell.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)indexPath.row + 1];
-    if (KTShowSource()) {
-        cell.textLabel.text = item.appName.length ? item.appName : @"未知应用";
-        cell.detailTextLabel.text = item.text ?: @"";
-    } else {
-        cell.textLabel.text = item.text ?: @"";
-        cell.detailTextLabel.text = @"";
-    }
-    cell.timeLabel.text = @"";
-    cell.dateLabel.text = @"";
+    cell.textLabel.text = item.text ?: @"";
+    cell.detailTextLabel.text = KTShowSource() ? (item.appName.length ? item.appName : @"未知应用") : @"";
+    cell.timeLabel.text = item.date ? [KTClipboardTimeFormatter() stringFromDate:item.date] : @"";
+    cell.dateLabel.text = item.date ? [KTClipboardDateFormatter() stringFromDate:item.date] : @"";
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.imageView.image = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleGray;
@@ -319,6 +335,24 @@
     }];
     delete.image = [UIImage systemImageNamed:@"trash"];
     return @[delete, favorite];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    if ([gestureRecognizer isKindOfClass:UIPanGestureRecognizer.class]) {
+        UIView *v = touch.view;
+        while (v) {
+            if (v == self.table) return NO;
+            v = v.superview;
+        }
+    }
+    return YES;
+}
+
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
+    if (![gestureRecognizer isKindOfClass:UIPanGestureRecognizer.class]) return YES;
+    UIPanGestureRecognizer *pan = (UIPanGestureRecognizer *)gestureRecognizer;
+    CGPoint v = [pan velocityInView:self.view];
+    return fabs(v.y) >= fabs(v.x);
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
