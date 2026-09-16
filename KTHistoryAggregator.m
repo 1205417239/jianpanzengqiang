@@ -44,7 +44,7 @@ static KTClipboardItem *KTItemFromStmt(sqlite3_stmt *stmt) {
 
 + (void)recordItem:(KTClipboardItem *)item {
     if (!item.text.length || !KTDBReady()) return;
-    dispatch_async(KTDBQueue, ^{
+    dispatch_sync(KTDBQueue, ^{
         KTDBOpen();
         sqlite3_stmt *stmt = NULL;
         const char *sql = "INSERT INTO history(text,bundle,app,timestamp,favorite) VALUES(?,?,?,?,0);";
