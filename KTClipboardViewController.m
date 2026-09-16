@@ -1,6 +1,7 @@
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
 #import "KTSettings.h"
+#import "KTHistoryAggregator.h"
 #import <UIKit/UIKit.h>
 
 @interface KTClipboardCell : UITableViewCell
@@ -229,7 +230,7 @@
 }
 
 - (void)reload {
-    self.items = self.segment.selectedSegmentIndex == 1 ? KTClipboardManager.sharedManager.favorites : KTClipboardManager.sharedManager.items;
+    self.items = self.segment.selectedSegmentIndex == 1 ? [KTHistoryAggregator favorites] : [KTHistoryAggregator items];
     [self.table reloadData];
 }
 
