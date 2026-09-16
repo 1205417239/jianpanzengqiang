@@ -117,12 +117,22 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 }
 
 - (NSArray *)items {
+    NSArray *saved=[NSArray arrayWithContentsOfFile:KTStoreKey];
+    if ([saved isKindOfClass:NSArray.class]) {
+        NSMutableArray *merged=[NSMutableArray arrayWithCapacity:saved.count];
+        for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [merged addObject:[KTClipboardItem itemWithDictionary:d]];
+        [merged sortUsingComparator:^NSComparisonResult(KTClipboardItem *a, KTClipboardItem *b) {
+            return [b.recordedAt compare:a.recordedAt];
+        }];
+        return merged;
+    }
     return [self.mutableItems copy];
 }
 
 - (NSArray *)favorites {
+    NSArray *all=[self items];
     NSMutableArray *a=[NSMutableArray array];
-    for (KTClipboardItem *i in self.mutableItems) if (i.favorite) [a addObject:i];
+    for (KTClipboardItem *i in all) if (i.favorite) [a addObject:i];
     return a;
 }
 
