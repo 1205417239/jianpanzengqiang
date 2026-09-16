@@ -306,7 +306,7 @@
         BOOL value = !item.favorite;
         [KTClipboardManager.sharedManager setFavorite:value forItem:item];
         completionHandler(YES);
-        [self reload];
+        dispatch_async(dispatch_get_main_queue(), ^{ [self reload]; });
     }];
     favorite.image = [UIImage systemImageNamed:item.favorite ? @"star.slash" : @"star"];
     favorite.backgroundColor = UIColor.systemOrangeColor;
@@ -314,7 +314,7 @@
     UIContextualAction *delete = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:@"" handler:^(UIContextualAction *action, UIView *sourceView, void (^completionHandler)(BOOL)) {
         [KTClipboardManager.sharedManager removeItem:item];
         completionHandler(YES);
-        [self reload];
+        dispatch_async(dispatch_get_main_queue(), ^{ [self reload]; });
     }];
     delete.image = [UIImage systemImageNamed:@"trash"];
     return @[delete, favorite];

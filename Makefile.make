@@ -10,6 +10,7 @@ TWEAK_NAME = KeyboardToolsKayoko
 KeyboardToolsKayoko_FILES = Tweak.xm KTClipboardManager.m KTClipboardViewController.m
 KeyboardToolsKayoko_CFLAGS = -fobjc-arc
 KeyboardToolsKayoko_FRAMEWORKS = UIKit Foundation
+KeyboardToolsKayoko_LIBRARIES = sqlite3
 
 BUNDLE_NAME = KeyboardToolsKayokoPrefs
 
