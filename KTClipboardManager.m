@@ -13,13 +13,53 @@ static NSString *KTAppName(void) {
     return b.localizedInfoDictionary[@"CFBundleDisplayName"] ?: b.infoDictionary[@"CFBundleDisplayName"] ?: b.infoDictionary[@"CFBundleName"] ?: b.bundleIdentifier ?: @"未知应用";
 }
 
-static NSString *KTTextFromPasteboard(UIPasteboard *pb) {
-    NSString *s = pb.string;
-    return [s isKindOfClass:NSString.class] ? s : @"";
+static NSString *KTStringValue(id value) {
+    return [value isKindOfClass:NSString.class] ? value : @"";
 }
+
+static NSString *KTFileNameFromURL(NSURL *url) {
+    if (!url) return @"";
+    NSString *name = url.lastPathComponent;
+    return name.length ? name : url.absoluteString ?: @"";
+}
+
+static NSString *KTClipboardDisplayText(UIPasteboard *pb) {
+    if (!pb) return @"";
+    NSString *s = KTStringValue(pb.string);
+    if (s.length) return s;
+
+    NSURL *url = pb.URL;
+    if (url) return url.absoluteString ?: @"";
+
+    for (NSDictionary *item in pb.items) {
+        if (![item isKindOfClass:NSDictionary.class]) continue;
+        for (id key in item) {
+            id value = item[key];
+            NSString *type = [key isKindOfClass:NSString.class] ? key : @"";
+            if ([type rangeOfString:@"file-url" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+                if ([value isKindOfClass:NSURL.class]) return KTFileNameFromURL(value);
+                if ([value isKindOfClass:NSData.class]) {
+                    NSString *raw = [[NSString alloc] initWithData:value encoding:NSUTF8StringEncoding];
+                    if (raw.length) return raw.lastPathComponent.length ? raw.lastPathComponent : raw;
+                    id plist = [NSPropertyListSerialization propertyListWithData:value options:NSPropertyListImmutable format:nil error:nil];
+                    if ([plist isKindOfClass:NSString.class]) return plist.lastPathComponent.length ? plist.lastPathComponent : plist;
+                    if ([plist isKindOfClass:NSURL.class]) return KTFileNameFromURL(plist);
+                }
+            }
+            if ([value isKindOfClass:NSString.class] && ((NSString *)value).length) return value;
+        }
+    }
+
+    if (pb.hasImages) return @"图片";
+    if (pb.items.count) return @"剪贴板内容";
+    return @"";
+}
+
+static void KTHookPasteboard(void);
 
 @interface KTClipboardManager ()
 @property(nonatomic,strong) NSMutableArray<KTClipboardItem *> *mutableItems;
+@property(nonatomic,assign) NSInteger lastChangeCount;
 @end
 
 @implementation KTClipboardItem
@@ -54,11 +94,9 @@ static void KTHookPasteboard(void) {
         Method m = class_getInstanceMethod(cls, @selector(setString:));
         Method h = class_getInstanceMethod(cls, @selector(kt_setString:));
         if (m && h) method_exchangeImplementations(m, h);
-
         m = class_getInstanceMethod(cls, @selector(setItems:));
         h = class_getInstanceMethod(cls, @selector(kt_setItems:));
         if (m && h) method_exchangeImplementations(m, h);
-
         m = class_getInstanceMethod(cls, @selector(setItems:options:));
         h = class_getInstanceMethod(cls, @selector(kt_setItems:options:));
         if (m && h) method_exchangeImplementations(m, h);
@@ -76,18 +114,25 @@ static void KTHookPasteboard(void) {
 - (instancetype)init {
     if ((self = [super init])) {
         _mutableItems = [NSMutableArray array];
-        [self reloadFromDisk];
+        _lastChangeCount = -1;
+        [self reloadFromDiskPreservingOnFailure:YES];
         KTHookPasteboard();
     }
     return self;
 }
 
-- (void)reloadFromDisk {
+- (BOOL)reloadFromDiskPreservingOnFailure:(BOOL)preserve {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL exists = [fm fileExistsAtPath:KTStoreKey];
     NSArray *saved = [NSArray arrayWithContentsOfFile:KTStoreKey];
+    if (!saved && exists) return NO;
     [self.mutableItems removeAllObjects];
-    for (NSDictionary *d in saved) {
-        if ([d isKindOfClass:NSDictionary.class]) [self.mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
+    if ([saved isKindOfClass:NSArray.class]) {
+        for (NSDictionary *d in saved) {
+            if ([d isKindOfClass:NSDictionary.class]) [self.mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
+        }
     }
+    return YES;
 }
 
 - (void)saveUnlocked {
@@ -111,7 +156,11 @@ static void KTHookPasteboard(void) {
 
 - (void)recordCurrentClipboard {
     if (!KTEnabled() || !KTRecordClipboard()) return;
-    NSString *s = KTTextFromPasteboard(UIPasteboard.generalPasteboard);
+    UIPasteboard *pb = UIPasteboard.generalPasteboard;
+    NSInteger changeCount = pb.changeCount;
+    if (changeCount == self.lastChangeCount) return;
+    self.lastChangeCount = changeCount;
+    NSString *s = KTClipboardDisplayText(pb);
     if (!s.length) return;
     NSString *bid = NSBundle.mainBundle.bundleIdentifier ?: @"";
     [self addText:s bundleIdentifier:bid appName:KTAppName()];
@@ -123,19 +172,16 @@ static void KTHookPasteboard(void) {
 
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name {
     if (!text.length || !KTEnabled() || !KTRecordClipboard()) return;
-
     [self withStoreLock:^{
-        [self reloadFromDisk];
-
+        if (![self reloadFromDiskPreservingOnFailure:YES]) return;
         KTClipboardItem *first = self.mutableItems.firstObject;
         if (first && [first.text isEqualToString:text]) {
-            first.bundleIdentifier = bid ?: @"";
-            first.appName = name ?: @"未知应用";
-            first.date = [NSDate date];
+            if (!first.appName.length) first.appName = name ?: @"未知应用";
+            if (!first.bundleIdentifier.length) first.bundleIdentifier = bid ?: @"";
+            if (!first.date) first.date = [NSDate date];
             [self saveUnlocked];
             return;
         }
-
         KTClipboardItem *item = [KTClipboardItem new];
         item.text = text;
         item.bundleIdentifier = bid ?: @"";
@@ -143,7 +189,6 @@ static void KTHookPasteboard(void) {
         item.favorite = NO;
         item.date = [NSDate date];
         [self.mutableItems insertObject:item atIndex:0];
-
         NSUInteger limit = MAX(1, KTHistoryLimit());
         while (self.mutableItems.count > limit) {
             NSInteger removeIndex = -1;
@@ -159,12 +204,12 @@ static void KTHookPasteboard(void) {
 
 - (NSArray *)items {
     if (!KTEnabled() || !KTRecordClipboard()) return @[];
-    [self reloadFromDisk];
+    [self withStoreLock:^{ [self reloadFromDiskPreservingOnFailure:YES]; }];
     return [self.mutableItems copy];
 }
 
 - (NSArray *)favorites {
-    [self reloadFromDisk];
+    [self withStoreLock:^{ [self reloadFromDiskPreservingOnFailure:YES]; }];
     NSMutableArray *a = [NSMutableArray array];
     for (KTClipboardItem *i in self.mutableItems) if (i.favorite) [a addObject:i];
     return a;
@@ -173,7 +218,7 @@ static void KTHookPasteboard(void) {
 - (void)setFavorite:(BOOL)favorite forItem:(KTClipboardItem *)item {
     if (!item) return;
     [self withStoreLock:^{
-        [self reloadFromDisk];
+        if (![self reloadFromDiskPreservingOnFailure:YES]) return;
         for (KTClipboardItem *saved in self.mutableItems) {
             if ([saved.text isEqualToString:item.text] && [saved.date isEqualToDate:item.date]) {
                 saved.favorite = favorite;
@@ -187,7 +232,7 @@ static void KTHookPasteboard(void) {
 - (void)removeItem:(KTClipboardItem *)item {
     if (!item) return;
     [self withStoreLock:^{
-        [self reloadFromDisk];
+        if (![self reloadFromDiskPreservingOnFailure:YES]) return;
         for (KTClipboardItem *saved in [self.mutableItems copy]) {
             if ([saved.text isEqualToString:item.text] && [saved.date isEqualToDate:item.date]) {
                 [self.mutableItems removeObject:saved];
@@ -200,7 +245,7 @@ static void KTHookPasteboard(void) {
 
 - (void)clearClipboardHistory {
     [self withStoreLock:^{
-        [self reloadFromDisk];
+        if (![self reloadFromDiskPreservingOnFailure:YES]) return;
         NSIndexSet *idx = [self.mutableItems indexesOfObjectsPassingTest:^BOOL(KTClipboardItem *i, NSUInteger n, BOOL *stop) {
             return !i.favorite;
         }];
@@ -224,7 +269,7 @@ static void KTHookPasteboard(void) {
 @implementation UIPasteboard (KTClipboardHooks)
 - (void)kt_setString:(NSString *)string {
     [self kt_setString:string];
-    if (self == UIPasteboard.generalPasteboard) [[KTClipboardManager sharedManager] addText:string bundleIdentifier:NSBundle.mainBundle.bundleIdentifier ?: @"" appName:KTAppName()];
+    if (self == UIPasteboard.generalPasteboard) [[KTClipboardManager sharedManager] recordCurrentClipboard];
 }
 - (void)kt_setItems:(NSArray *)items {
     [self kt_setItems:items];
