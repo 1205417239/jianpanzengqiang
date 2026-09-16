@@ -14,6 +14,7 @@
 + (instancetype)sharedManager;
 - (void)startMonitoring;
 - (void)addCurrentClipboard;
+- (void)recordCurrentClipboardFromBundleIdentifier:(NSString *)bid appName:(NSString *)name;
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name;
 - (NSArray *)items;
 - (NSArray *)favorites;
