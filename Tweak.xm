@@ -4,6 +4,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
+#import "KTHistoryAggregator.h"
 
 static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
@@ -169,6 +170,15 @@ static void KTInstallToolbar(UIView *dock) {
     KTAddButton(dock, stack, @"arrow.uturn.backward", @"撤销", @selector(kt_undo:));
     KTAddButton(dock, stack, @"keyboard.chevron.compact.down", @"收起", @selector(kt_dismiss:));
 }
+
+%hook KTClipboardManager
+
+- (void)save {
+    %orig;
+    [KTHistoryAggregator mergeItems:[self items]];
+}
+
+%end
 
 %hook UIResponder
 
