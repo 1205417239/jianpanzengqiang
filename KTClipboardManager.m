@@ -126,6 +126,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 - (void)startMonitoring {
     if (!KTEnabled() || !KTRecordClipboard()) return;
+    [self addCurrentClipboard];
 }
 
 - (void)pasteboardChanged:(NSNotification *)note {
@@ -190,6 +191,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 }
 
 - (NSArray *)items {
+    if (KTEnabled() && KTRecordClipboard()) [self addCurrentClipboard];
     NSArray *fresh=[self readItems:NO];
     self.mutableItems=[fresh mutableCopy] ?: [NSMutableArray array];
     return fresh;
