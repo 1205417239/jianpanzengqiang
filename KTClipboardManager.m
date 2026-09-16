@@ -1,23 +1,8 @@
 #import "KTClipboardManager.h"
 #import "KTSettings.h"
-#include <fcntl.h>
-#include <sys/file.h>
-#include <unistd.h>
 
 static NSString * const KTStoreKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.plist";
 static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
-static NSString * const KTLockKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.lock";
-
-static int KTLock(void) {
-    int fd=open(KTLockKey.UTF8String, O_CREAT|O_RDWR, 0600);
-    if (fd < 0) return -1;
-    if (flock(fd, LOCK_EX) != 0) { close(fd); return -1; }
-    return fd;
-}
-
-static void KTUnlock(int fd) {
-    if (fd >= 0) { flock(fd, LOCK_UN); close(fd); }
-}
 
 @implementation KTClipboardItem
 - (NSDictionary *)dictionary {
@@ -50,8 +35,9 @@ static void KTUnlock(int fd) {
 
 - (instancetype)init {
     if ((self=[super init])) {
+        NSArray *saved=[NSArray arrayWithContentsOfFile:KTStoreKey];
         _mutableItems=[NSMutableArray array];
-        [self reloadFromDisk];
+        for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
     }
     return self;
@@ -60,47 +46,9 @@ static void KTUnlock(int fd) {
 - (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
 
 - (void)save {
-    int fd=KTLock();
-    NSArray *disk=[NSArray arrayWithContentsOfFile:KTStoreKey];
-    NSMutableArray *merged=[NSMutableArray array];
-    for (NSDictionary *d in disk) if ([d isKindOfClass:NSDictionary.class]) [merged addObject:d];
-    for (KTClipboardItem *item in self.mutableItems) {
-        NSDictionary *d=item.dictionary;
-        BOOL exists=NO;
-        NSNumber *ts=d[@"timestamp"];
-        NSString *text=d[@"text"];
-        NSString *bundle=d[@"bundle"];
-        for (NSDictionary *e in merged) {
-            if ([e[@"timestamp"] doubleValue] == [ts doubleValue] && [e[@"text"] isEqual:text] && [e[@"bundle"] isEqual:bundle]) { exists=YES; break; }
-        }
-        if (!exists) [merged addObject:d];
-    }
-    [merged sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
-        return [b[@"timestamp"] doubleValue] > [a[@"timestamp"] doubleValue] ? NSOrderedAscending : ([b[@"timestamp"] doubleValue] < [a[@"timestamp"] doubleValue] ? NSOrderedDescending : NSOrderedSame);
-    }];
-    while (merged.count > KTHistoryLimit()) {
-        NSUInteger removeIndex=NSNotFound;
-        for (NSInteger n=(NSInteger)merged.count-1; n>=0; n--) if (![merged[(NSUInteger)n][@"favorite"] boolValue]) { removeIndex=(NSUInteger)n; break; }
-        if (removeIndex==NSNotFound) break;
-        [merged removeObjectAtIndex:removeIndex];
-    }
-    [merged writeToFile:KTStoreKey atomically:YES];
-    [self.mutableItems removeAllObjects];
-    for (NSDictionary *d in merged) [self.mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
-    KTUnlock(fd);
-}
-
-- (void)reloadFromDisk {
-    int fd=KTLock();
-    NSArray *saved=[NSArray arrayWithContentsOfFile:KTStoreKey];
-    NSMutableArray *fresh=[NSMutableArray array];
-    for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [fresh addObject:[KTClipboardItem itemWithDictionary:d]];
-    [fresh sortUsingComparator:^NSComparisonResult(KTClipboardItem *a, KTClipboardItem *b) {
-        return [b.recordedAt compare:a.recordedAt];
-    }];
-    [self.mutableItems removeAllObjects];
-    [self.mutableItems addObjectsFromArray:fresh];
-    KTUnlock(fd);
+    NSMutableArray *a=[NSMutableArray arrayWithCapacity:self.mutableItems.count];
+    for (KTClipboardItem *i in self.mutableItems) [a addObject:i.dictionary];
+    [a writeToFile:KTStoreKey atomically:YES];
 }
 
 - (void)startMonitoring {
