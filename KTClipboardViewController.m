@@ -95,7 +95,15 @@
     [self.menuButton setImage:[UIImage systemImageNamed:@"ellipsis.circle"] forState:UIControlStateNormal];
     self.menuButton.tintColor = UIColor.secondaryLabelColor;
     self.menuButton.accessibilityLabel = @"管理";
-    [self.menuButton addTarget:self action:@selector(showMenu:) forControlEvents:UIControlEventTouchUpInside];
+    UIAction *clearHistory = [UIAction actionWithTitle:@"清除剪贴板" image:[UIImage systemImageNamed:@"trash"] identifier:nil handler:^(__kindof UIAction *action) {
+        [KTClipboardManager.sharedManager clearClipboardHistory];
+        [self reload];
+    }];
+    UIAction *clearImages = [UIAction actionWithTitle:@"清除图片" image:[UIImage systemImageNamed:@"photo.on.rectangle"] identifier:nil handler:^(__kindof UIAction *action) {
+        [KTClipboardManager.sharedManager clearImages];
+    }];
+    self.menuButton.menu = [UIMenu menuWithTitle:@"" children:@[clearHistory, clearImages]];
+    self.menuButton.showsMenuAsPrimaryAction = YES;
     [self.panel addSubview:self.menuButton];
 
     self.clipboardTab = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -103,7 +111,7 @@
     [self.clipboardTab setTitle:@"剪贴板" forState:UIControlStateNormal];
     [self.favoriteTab setTitle:@"收藏夹" forState:UIControlStateNormal];
     for (UIButton *b in @[self.clipboardTab, self.favoriteTab]) {
-        b.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+        b.titleLabel.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
         b.layer.cornerRadius = 10.0;
         b.backgroundColor = UIColor.clearColor;
         [self.panel addSubview:b];
@@ -161,8 +169,8 @@
     self.grabber.frame = CGRectMake((width - 38.0) / 2.0, 7.0, 38.0, 5.0);
     self.menuButton.frame = CGRectMake(12.0, 20.0, 38.0, 38.0);
 
-    CGFloat tabWidth = 100.0;
-    CGFloat gap = 2.0;
+    CGFloat tabWidth = 78.0;
+    CGFloat gap = 0.0;
     CGFloat tabsX = (width - tabWidth * 2.0 - gap) / 2.0;
     CGFloat tabsY = 18.0;
     self.clipboardTab.frame = CGRectMake(tabsX, tabsY, tabWidth, 40.0);
@@ -203,20 +211,6 @@
     [UIView animateWithDuration:0.22 delay:0.0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
         self.tabIndicator.frame = CGRectMake(x, 56.0, CGRectGetWidth(self.clipboardTab.frame) - 44.0, 3.0);
     } completion:nil];
-}
-
-- (void)showMenu:(UIButton *)sender {
-    UIAction *clearHistory = [UIAction actionWithTitle:@"清除剪贴板" image:[UIImage systemImageNamed:@"trash"] identifier:nil handler:^(__kindof UIAction *action) {
-        [KTClipboardManager.sharedManager clearClipboardHistory];
-        [self reload];
-    }];
-    UIAction *clearImages = [UIAction actionWithTitle:@"清除图片" image:[UIImage systemImageNamed:@"photo.on.rectangle"] identifier:nil handler:^(__kindof UIAction *action) {
-        [KTClipboardManager.sharedManager clearImages];
-    }];
-    UIMenu *menu = [UIMenu menuWithTitle:@"" children:@[clearHistory, clearImages]];
-    sender.menu = menu;
-    sender.showsMenuAsPrimaryAction = YES;
-    [sender sendActionsForControlEvents:UIControlEventTouchUpInside];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.items.count; }
