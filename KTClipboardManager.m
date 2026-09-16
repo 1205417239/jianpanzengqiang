@@ -1,8 +1,12 @@
 #import "KTClipboardManager.h"
 #import "KTSettings.h"
+#include <sys/file.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 static NSString * const KTStoreKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.plist";
 static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
+static NSString * const KTLockKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.lock";
 
 @implementation KTClipboardItem
 - (NSDictionary *)dictionary {
@@ -35,15 +39,30 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 - (instancetype)init {
     if ((self=[super init])) {
-        NSArray *saved=[NSArray arrayWithContentsOfFile:KTStoreKey];
         _mutableItems=[NSMutableArray array];
-        for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
+        [self reloadFromDisk];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
     }
     return self;
 }
 
 - (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
+
+- (int)lockHistory {
+    int fd=open(KTLockKey, O_CREAT|O_RDWR, 0600);
+    if (fd>=0) flock(fd, LOCK_EX);
+    return fd;
+}
+
+- (void)unlockHistory:(int)fd {
+    if (fd>=0) { flock(fd, LOCK_UN); close(fd); }
+}
+
+- (void)reloadFromDisk {
+    NSArray *saved=[NSArray arrayWithContentsOfFile:KTStoreKey];
+    [self.mutableItems removeAllObjects];
+    for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [self.mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
+}
 
 - (void)save {
     NSMutableArray *a=[NSMutableArray arrayWithCapacity:self.mutableItems.count];
@@ -66,14 +85,10 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
     NSString *text=pb.string;
     if (!text.length) return;
-
     NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
     NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
     NSDate *recordedAt=NSDate.date;
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:recordedAt];
-    });
+    [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:recordedAt];
 }
 
 - (void)addCurrentClipboard {
@@ -84,7 +99,6 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     NSNumber *last=[defaults objectForKey:KTLastPasteboardChange];
     if (last && last.integerValue == change) return;
     [defaults setObject:@(change) forKey:KTLastPasteboardChange];
-
     NSString *text=pb.string;
     if (!text.length) return;
     NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
@@ -94,6 +108,8 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 - (void)addCapturedText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name recordedAt:(NSDate *)recordedAt {
     if (!text.length) return;
+    int fd=[self lockHistory];
+    [self reloadFromDisk];
     KTClipboardItem *i=[KTClipboardItem new];
     i.text=text;
     i.bundleIdentifier=bid ?: @"";
@@ -110,6 +126,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
         [self.mutableItems removeObjectAtIndex:removeIndex];
     }
     [self save];
+    [self unlockHistory:fd];
 }
 
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name {
@@ -117,22 +134,55 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 }
 
 - (NSArray *)items {
-    return [self.mutableItems copy];
+    int fd=[self lockHistory];
+    [self reloadFromDisk];
+    NSArray *result=[self.mutableItems copy];
+    [self unlockHistory:fd];
+    return result;
 }
 
 - (NSArray *)favorites {
+    int fd=[self lockHistory];
+    [self reloadFromDisk];
     NSMutableArray *a=[NSMutableArray array];
     for (KTClipboardItem *i in self.mutableItems) if (i.favorite) [a addObject:i];
-    return a;
+    NSArray *result=[a copy];
+    [self unlockHistory:fd];
+    return result;
 }
 
-- (void)setFavorite:(BOOL)favorite forItem:(KTClipboardItem *)item { if (!item) return; item.favorite=favorite; [self save]; }
-- (void)removeItem:(KTClipboardItem *)item { if (!item) return; [self.mutableItems removeObject:item]; [self save]; }
+- (KTClipboardItem *)matchingItem:(KTClipboardItem *)item inArray:(NSArray *)array {
+    for (KTClipboardItem *x in array) {
+        if (fabs(x.recordedAt.timeIntervalSince1970-item.recordedAt.timeIntervalSince1970)<0.001 && [x.text isEqualToString:item.text ?: @""] && [x.bundleIdentifier isEqualToString:item.bundleIdentifier ?: @""]) return x;
+    }
+    return nil;
+}
+
+- (void)setFavorite:(BOOL)favorite forItem:(KTClipboardItem *)item {
+    if (!item) return;
+    int fd=[self lockHistory];
+    [self reloadFromDisk];
+    KTClipboardItem *target=[self matchingItem:item inArray:self.mutableItems];
+    if (target) { target.favorite=favorite; [self save]; }
+    [self unlockHistory:fd];
+}
+
+- (void)removeItem:(KTClipboardItem *)item {
+    if (!item) return;
+    int fd=[self lockHistory];
+    [self reloadFromDisk];
+    KTClipboardItem *target=[self matchingItem:item inArray:self.mutableItems];
+    if (target) { [self.mutableItems removeObject:target]; [self save]; }
+    [self unlockHistory:fd];
+}
 
 - (void)clearClipboardHistory {
+    int fd=[self lockHistory];
+    [self reloadFromDisk];
     NSIndexSet *idx=[self.mutableItems indexesOfObjectsPassingTest:^BOOL(KTClipboardItem *i, NSUInteger n, BOOL *stop){ return !i.favorite; }];
     [self.mutableItems removeObjectsAtIndexes:idx];
     [self save];
+    [self unlockHistory:fd];
 }
 
 - (void)clearImages { UIPasteboard *pb=UIPasteboard.generalPasteboard; if (pb.hasImages) pb.items=@[]; }
