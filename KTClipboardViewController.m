@@ -91,19 +91,33 @@
     panelPan.cancelsTouchesInView = NO;
     [self.panel addGestureRecognizer:panelPan];
 
+    self.clearHistoryButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.clearHistoryButton setImage:[UIImage systemImageNamed:@"trash"] forState:UIControlStateNormal];
+    self.clearHistoryButton.tintColor = UIColor.systemRedColor;
+    self.clearHistoryButton.accessibilityLabel = @"清除剪贴板";
+    self.clearHistoryButton.hidden = YES;
+    self.clearHistoryButton.alpha = 0.0;
+    self.clearHistoryButton.backgroundColor = UIColor.systemBackgroundColor;
+    self.clearHistoryButton.layer.cornerRadius = 19.0;
+    [self.clearHistoryButton addTarget:self action:@selector(clearHistory) forControlEvents:UIControlEventTouchUpInside];
+    [self.panel addSubview:self.clearHistoryButton];
+
+    self.clearImagesButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.clearImagesButton setImage:[UIImage systemImageNamed:@"photo.on.rectangle"] forState:UIControlStateNormal];
+    self.clearImagesButton.tintColor = UIColor.secondaryLabelColor;
+    self.clearImagesButton.accessibilityLabel = @"清除图片";
+    self.clearImagesButton.hidden = YES;
+    self.clearImagesButton.alpha = 0.0;
+    self.clearImagesButton.backgroundColor = UIColor.systemBackgroundColor;
+    self.clearImagesButton.layer.cornerRadius = 19.0;
+    [self.clearImagesButton addTarget:self action:@selector(clearImages) forControlEvents:UIControlEventTouchUpInside];
+    [self.panel addSubview:self.clearImagesButton];
+
     self.menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.menuButton setImage:[UIImage systemImageNamed:@"ellipsis.circle"] forState:UIControlStateNormal];
+    [self.menuButton setImage:[UIImage systemImageNamed:@"line.3.horizontal"] forState:UIControlStateNormal];
     self.menuButton.tintColor = UIColor.secondaryLabelColor;
     self.menuButton.accessibilityLabel = @"管理";
-    UIAction *clearHistory = [UIAction actionWithTitle:@"清除剪贴板" image:[UIImage systemImageNamed:@"trash"] identifier:nil handler:^(__kindof UIAction *action) {
-        [KTClipboardManager.sharedManager clearClipboardHistory];
-        [self reload];
-    }];
-    UIAction *clearImages = [UIAction actionWithTitle:@"清除图片" image:[UIImage systemImageNamed:@"photo.on.rectangle"] identifier:nil handler:^(__kindof UIAction *action) {
-        [KTClipboardManager.sharedManager clearImages];
-    }];
-    self.menuButton.menu = [UIMenu menuWithTitle:@"" children:@[clearHistory, clearImages]];
-    self.menuButton.showsMenuAsPrimaryAction = YES;
+    [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     [self.panel addSubview:self.menuButton];
 
     self.clipboardTab = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -167,7 +181,9 @@
     self.panel.frame = CGRectMake(0.0, height - panelHeight, width, panelHeight);
 
     self.grabber.frame = CGRectMake((width - 38.0) / 2.0, 7.0, 38.0, 5.0);
-    self.menuButton.frame = CGRectMake(12.0, 20.0, 38.0, 38.0);
+    self.clearHistoryButton.frame = CGRectMake(12.0, 20.0, 38.0, 38.0);
+    self.clearImagesButton.frame = CGRectMake(56.0, 20.0, 38.0, 38.0);
+    self.menuButton.frame = CGRectMake(12.0, 62.0, 38.0, 38.0);
 
     CGFloat tabWidth = 78.0;
     CGFloat gap = 0.0;
@@ -178,6 +194,29 @@
     self.tabIndicator.frame = CGRectMake(tabsX + 22.0, 56.0, tabWidth - 44.0, 3.0);
 
     self.table.frame = CGRectMake(0.0, 68.0, width, panelHeight - 68.0);
+}
+
+- (void)clearHistory { [KTClipboardManager.sharedManager clearClipboardHistory]; [self reload]; }
+- (void)clearImages { [KTClipboardManager.sharedManager clearImages]; }
+
+- (void)toggleMenu {
+    BOOL show = self.clearHistoryButton.hidden;
+    if (show) {
+        self.clearHistoryButton.hidden = NO;
+        self.clearImagesButton.hidden = NO;
+        [UIView animateWithDuration:0.16 animations:^{
+            self.clearHistoryButton.alpha = 1.0;
+            self.clearImagesButton.alpha = 1.0;
+        }];
+    } else {
+        [UIView animateWithDuration:0.14 animations:^{
+            self.clearHistoryButton.alpha = 0.0;
+            self.clearImagesButton.alpha = 0.0;
+        } completion:^(BOOL finished) {
+            self.clearHistoryButton.hidden = YES;
+            self.clearImagesButton.hidden = YES;
+        }];
+    }
 }
 
 - (void)reload {
