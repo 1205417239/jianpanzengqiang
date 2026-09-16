@@ -59,6 +59,8 @@
 @property(nonatomic,strong) NSArray *items;
 @property(nonatomic,strong) UIView *grabber;
 @property(nonatomic,strong) UIButton *menuButton;
+@property(nonatomic,strong) UIButton *clearHistoryButton;
+@property(nonatomic,strong) UIButton *clearImagesButton;
 @property(nonatomic,assign) CGFloat dragStartHeight;
 @property(nonatomic,assign) BOOL dragging;
 @end
