@@ -1,2 +1,8 @@
 #!/bin/sh
+DAEMON_PLIST="/var/jb/Library/LaunchDaemons/com.keyboardtoolskayoko.clipboardd.plist"
+if [ -f "$DAEMON_PLIST" ]; then
+    /bin/launchctl bootout system "$DAEMON_PLIST" >/dev/null 2>&1 || true
+    /bin/launchctl bootstrap system "$DAEMON_PLIST" >/dev/null 2>&1 || true
+    /bin/launchctl enable system/com.keyboardtoolskayoko.clipboardd >/dev/null 2>&1 || true
+fi
 exit 0
