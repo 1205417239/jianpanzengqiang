@@ -53,7 +53,7 @@ static NSString *KTName(void){
     for(NSString*n in @[@"displayName",@"localizedName"]){
         SEL s=NSSelectorFromString(n);
         id v=(a&&[a respondsToSelector:s])?((id(*)(id,SEL))objc_msgSend)(a,s):nil;
-        if([v isKindOfClass:NSString.class]&&((NSString *)v).length)return v;
+        if([v isKindOfClass:NSString.class]&&[(NSString *)v length]>0)return (NSString *)v;
     }
     return KTBundle();
 }
@@ -66,7 +66,7 @@ static NSString *KTName(void){
 @interface KTClipboardManager ()
 @property(nonatomic,strong) NSMutableArray *mutableItems;
 @property(nonatomic,assign) NSInteger lastChangeCount;
-@property(nonatomic,assign) BOOL captureScheduled;
+
 @end
 
 @implementation KTClipboardManager
@@ -76,18 +76,22 @@ static NSString *KTName(void){
 - (void)startMonitoring{[self reloadFromDisk];self.lastChangeCount=UIPasteboard.generalPasteboard.changeCount;}
 - (void)pullPasteboardChanges{
     if(!KTEnabled()||!KTRecordClipboard())return;
-    UIPasteboard*p=UIPasteboard.generalPasteboard;
-    NSInteger changeCount=p.changeCount;
-    if(changeCount==self.lastChangeCount)return;
-    self.lastChangeCount=changeCount;
-    if(!p.hasStrings&&!p.hasImages)return;
-    NSString *text=p.string;
-    if(!text.length)return;
-    NSString *bundle=KTBundle();
-    NSString *name=KTName();
-    NSDate *date=NSDate.date;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{
-        [self addCapturedText:text bundleIdentifier:bundle appName:name recordedAt:date];
+    static dispatch_queue_t q;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ q=dispatch_queue_create("com.keyboardtoolskayoko.capture", DISPATCH_QUEUE_SERIAL); });
+    dispatch_async(q, ^{
+        if(!KTEnabled()||!KTRecordClipboard())return;
+        UIPasteboard *p=UIPasteboard.generalPasteboard;
+        NSInteger changeCount=p.changeCount;
+        if(changeCount==self.lastChangeCount)return;
+        NSString *text=p.string;
+        if(![text isKindOfClass:NSString.class] || text.length==0){
+            self.lastChangeCount=changeCount;
+            return;
+        }
+        NSDate *date=NSDate.date;
+        [self addCapturedText:text bundleIdentifier:@"" appName:@"" recordedAt:date];
+        self.lastChangeCount=changeCount;
     });
 }
 - (void)addCurrentClipboard{[self pullPasteboardChanges];}
