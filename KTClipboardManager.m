@@ -48,16 +48,6 @@ static NSString *KTBundle(void){
     return[v isKindOfClass:NSString.class]?v:@"";
 }
 
-static NSString *KTName(void){
-    id a=KTFront();
-    for(NSString*n in @[@"displayName",@"localizedName"]){
-        SEL s=NSSelectorFromString(n);
-        id v=(a&&[a respondsToSelector:s])?((id(*)(id,SEL))objc_msgSend)(a,s):nil;
-        if([v isKindOfClass:NSString.class]&&[(NSString *)v length]>0)return (NSString *)v;
-    }
-    return KTBundle();
-}
-
 @implementation KTClipboardItem
 - (NSDictionary*)dictionary{return @{@"text":self.text?:@"",@"bundle":self.bundleIdentifier?:@"",@"app":self.appName?:@"",@"timestamp":@((self.recordedAt?:NSDate.date).timeIntervalSince1970),@"favorite":@(self.favorite)};}
 + (instancetype)itemWithDictionary:(NSDictionary*)d{KTClipboardItem*i=[KTClipboardItem new];i.text=[d[@"text"]isKindOfClass:NSString.class]?d[@"text"]:@"";i.bundleIdentifier=[d[@"bundle"]isKindOfClass:NSString.class]?d[@"bundle"]:@"";i.appName=[d[@"app"]isKindOfClass:NSString.class]?d[@"app"]:@"";NSNumber*t=[d[@"timestamp"]isKindOfClass:NSNumber.class]?d[@"timestamp"]:nil;i.recordedAt=t?[NSDate dateWithTimeIntervalSince1970:t.doubleValue]:NSDate.date;i.favorite=[d[@"favorite"]boolValue];return i;}
