@@ -1,7 +1,6 @@
 #import <UIKit/UIKit.h>
 
 @interface KTClipboardItem : NSObject
-@property(nonatomic,assign) NSInteger rowID;
 @property(nonatomic,copy) NSString *text;
 @property(nonatomic,copy) NSString *bundleIdentifier;
 @property(nonatomic,copy) NSString *appName;
