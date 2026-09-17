@@ -236,7 +236,10 @@ static void KTInstallToolbar(UIView *dock) {
 
 static void KTClipboardDaemonChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
     if (!KTEnabled() || !KTRecordClipboard()) return;
-    dispatch_async(dispatch_get_main_queue(), ^{ [KTClipboardManager.sharedManager pullPasteboardChanges]; });
+    KTClipboardManager *m = KTClipboardManager.sharedManager;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [m pullPasteboardChanges];
+    });
 }
 
 %ctor {
