@@ -1,5 +1,6 @@
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
+#import "KTDebugLogger.h"
 #import "KTSettings.h"
 #import <UIKit/UIKit.h>
 

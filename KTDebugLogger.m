@@ -1,38 +1,41 @@
 #import "KTDebugLogger.h"
-#include <fcntl.h>
-#include <sys/file.h>
-#include <unistd.h>
 
-static NSString * const KTDebugPath = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.debug.log";
+static NSString * const KTDebugLogPath = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.debug.log";
 
 void KTDebugLog(NSString *format, ...) {
-    if (!format.length) return;
+    if (!format) return;
     va_list args;
     va_start(args, format);
-    NSString *message=[[NSString alloc] initWithFormat:format arguments:args];
+    NSString *line = [[NSString alloc] initWithFormat:format arguments:args];
     va_end(args);
-    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"?";
-    NSString *proc=NSProcessInfo.processInfo.processName ?: @"?";
-    NSString *line=[NSString stringWithFormat:@"[%@] %@ %@\n", proc, bid, message];
-    int fd=open(KTDebugPath.UTF8String, O_RDWR|O_CREAT, 0644);
-    if (fd<0) return;
-    flock(fd, LOCK_EX);
-    NSData *oldData=[NSData dataWithContentsOfFile:KTDebugPath];
-    NSString *old=oldData.length ? [[NSString alloc] initWithData:oldData encoding:NSUTF8StringEncoding] : @"";
-    NSString *all=[old stringByAppendingString:line];
-    NSArray *parts=[all componentsSeparatedByString:@"\n"];
-    NSUInteger start=parts.count>121 ? parts.count-121 : 0;
-    if (start>0) parts=[parts subarrayWithRange:NSMakeRange(start, parts.count-start)];
-    all=[parts componentsJoinedByString:@"\n"];
-    ftruncate(fd,0);
-    lseek(fd,0,SEEK_SET);
-    write(fd,all.UTF8String,strlen(all.UTF8String));
-    fsync(fd);
-    flock(fd, LOCK_UN);
-    close(fd);
+    if (!line.length) return;
+    NSString *s = [NSString stringWithFormat:@"%@\n", line];
+    NSFileHandle *h = [NSFileHandle fileHandleForWritingAtPath:KTDebugLogPath];
+    if (!h) {
+        [s writeToFile:KTDebugLogPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        return;
+    }
+    @try {
+        [h seekToEndOfFile];
+        [h writeData:[s dataUsingEncoding:NSUTF8StringEncoding]];
+        [h closeFile];
+    } @catch (__unused NSException *e) {}
+    NSDictionary *attr = [[NSFileManager defaultManager] attributesOfItemAtPath:KTDebugLogPath error:nil];
+    unsigned long long size = [attr[NSFileSize] unsignedLongLongValue];
+    if (size > 24000) {
+        NSString *all = [NSString stringWithContentsOfFile:KTDebugLogPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        NSArray *rows = [all componentsSeparatedByString:@"\n"];
+        NSUInteger start = rows.count > 120 ? rows.count - 120 : 0;
+        NSString *trim = [[rows subarrayWithRange:NSMakeRange(start, rows.count - start)] componentsJoinedByString:@"\n"];
+        [trim writeToFile:KTDebugLogPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    }
 }
 
 NSString *KTDebugLogText(void) {
-    NSString *s=[NSString stringWithContentsOfFile:KTDebugPath encoding:NSUTF8StringEncoding error:nil];
-    return s.length ? s : @"暂无调试日志";
+    NSString *s = [NSString stringWithContentsOfFile:KTDebugLogPath encoding:NSUTF8StringEncoding error:nil];
+    return s ?: @"暂无调试记录";
+}
+
+void KTDebugLogClear(void) {
+    [[NSFileManager defaultManager] removeItemAtPath:KTDebugLogPath error:nil];
 }

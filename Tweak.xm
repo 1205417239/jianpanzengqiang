@@ -236,13 +236,17 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
-        KTDebugLog(@"LOAD ios=%@", UIDevice.currentDevice.systemVersion);
-        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n){ KTDebugLog(@"ACTIVE"); }];
-        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n){ KTDebugLog(@"INACTIVE"); }];
+        KTDebugLog(@"LOAD process=%@ bundle=%@", NSProcessInfo.processInfo.processName, NSBundle.mainBundle.bundleIdentifier ?: @"");
         [KTClipboardManager.sharedManager startMonitoring];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
             CFSTR("com.keyboardtoolskayoko.reload"), NULL,
             CFNotificationSuspensionBehaviorDeliverImmediately);
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification *n) {
+            KTDebugLog(@"ACTIVE bundle=%@", NSBundle.mainBundle.bundleIdentifier ?: @"");
+        }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification *n) {
+            KTDebugLog(@"INACTIVE bundle=%@", NSBundle.mainBundle.bundleIdentifier ?: @"");
+        }];
     }
 }

@@ -6,6 +6,7 @@ extern "C" {
 
 void KTDebugLog(NSString *format, ...);
 NSString *KTDebugLogText(void);
+void KTDebugLogClear(void);
 
 #ifdef __cplusplus
 }

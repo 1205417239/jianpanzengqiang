@@ -10,15 +10,6 @@
 
         <dict>
             <key>cell</key>
-            <string>PSLinkCell</string>
-            <key>label</key>
-            <string>调试日志</string>
-            <key>detailControllerClass</key>
-            <string>KTDebugViewController</string>
-        </dict>
-
-        <dict>
-            <key>cell</key>
             <string>PSGroupCell</string>
             <key>label</key>
             <string>键盘工具栏</string>
@@ -102,6 +93,15 @@
             <string>ShowSource</string>
             <key>label</key>
             <string>显示来源应用</string>
+        </dict>
+
+        <dict>
+            <key>cell</key>
+            <string>PSLinkCell</string>
+            <key>detail</key>
+            <string>KTDebugViewController</string>
+            <key>label</key>
+            <string>调试日志</string>
         </dict>
 
         <dict>
