@@ -70,15 +70,8 @@
 
 - (instancetype)initWithInput:(id<UITextInput>)input {
     self = [super initWithNibName:nil bundle:nil];
-    if (self) {
-        _input = input;
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(historyChanged:) name:@"KTClipboardHistoryDidChange" object:nil];
-    }
+    if (self) _input = input;
     return self;
-}
-
-- (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewDidLoad {
@@ -238,11 +231,6 @@
 - (void)reload {
     self.items = self.segment.selectedSegmentIndex == 1 ? KTClipboardManager.sharedManager.favorites : KTClipboardManager.sharedManager.items;
     [self.table reloadData];
-}
-
-- (void)historyChanged:(NSNotification *)note {
-    if (!self.isViewLoaded || !self.view.window) return;
-    [self reload];
 }
 
 - (void)selectClipboardTab {

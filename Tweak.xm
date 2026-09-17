@@ -4,33 +4,12 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
+#import "KTDebugLogger.h"
 
 static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
 static KTClipboardViewController *KTClipboardController;
 static UIResponder *KTClipboardInput;
-static NSString *KTForegroundBundleIdentifier;
-static NSString *KTForegroundAppName;
-
-static void KTUpdateForegroundApp(void) {
-    NSBundle *bundle = NSBundle.mainBundle;
-    NSString *bid = bundle.bundleIdentifier ?: @"";
-    NSString *name = bundle.localizedInfoDictionary[@"CFBundleDisplayName"];
-    if (!name.length) name = bundle.infoDictionary[@"CFBundleDisplayName"];
-    if (!name.length) name = bundle.infoDictionary[@"CFBundleName"];
-    KTForegroundBundleIdentifier = [bid copy];
-    KTForegroundAppName = [name.length ? name : bid copy];
-}
-
-extern "C" NSString *KTCurrentForegroundBundleIdentifier(void) {
-    if (!KTForegroundBundleIdentifier.length) KTUpdateForegroundApp();
-    return KTForegroundBundleIdentifier ?: @"";
-}
-
-extern "C" NSString *KTCurrentForegroundAppName(void) {
-    if (!KTForegroundAppName.length) KTUpdateForegroundApp();
-    return KTForegroundAppName ?: @"";
-}
 
 @interface KTClipboardPassThroughWindow : UIWindow
 @property(nonatomic,weak) UIView *interactiveView;
@@ -257,13 +236,9 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
-        KTUpdateForegroundApp();
-        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
-            KTUpdateForegroundApp();
-        }];
-        [[NSNotificationCenter defaultCenter] addObserverForName:UISceneDidActivateNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
-            KTUpdateForegroundApp();
-        }];
+        KTDebugLog(@"LOAD ios=%@", UIDevice.currentDevice.systemVersion);
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n){ KTDebugLog(@"ACTIVE"); }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *n){ KTDebugLog(@"INACTIVE"); }];
         [KTClipboardManager.sharedManager startMonitoring];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
