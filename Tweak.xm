@@ -2,6 +2,7 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <CoreFoundation/CoreFoundation.h>
+#include <unistd.h>
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
 #import "KTDebugLogger.h"
@@ -106,6 +107,7 @@ static void KTClipboardOpen(void) {
         KTClipboardInput = input;
         [input resignFirstResponder];
 
+        KTDebugLog(@"OPEN input=%@ scene=%@", NSStringFromClass(input.class), scene ? @"YES" : @"NO");
         KTClipboardPassThroughWindow *window = [[KTClipboardPassThroughWindow alloc] initWithWindowScene:scene];
         window.frame = scene.coordinateSpace.bounds;
         window.backgroundColor = UIColor.clearColor;
@@ -236,17 +238,11 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
-        KTDebugLog(@"LOAD process=%@ bundle=%@", NSProcessInfo.processInfo.processName, NSBundle.mainBundle.bundleIdentifier ?: @"");
+        KTDebugLog(@"LOAD pid=%d app=%@ bundle=%@", getpid(), NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"");
         [KTClipboardManager.sharedManager startMonitoring];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,
             CFSTR("com.keyboardtoolskayoko.reload"), NULL,
             CFNotificationSuspensionBehaviorDeliverImmediately);
-        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification *n) {
-            KTDebugLog(@"ACTIVE bundle=%@", NSBundle.mainBundle.bundleIdentifier ?: @"");
-        }];
-        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification *n) {
-            KTDebugLog(@"INACTIVE bundle=%@", NSBundle.mainBundle.bundleIdentifier ?: @"");
-        }];
     }
 }

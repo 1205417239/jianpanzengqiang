@@ -1,6 +1,7 @@
 #import "KTClipboardManager.h"
 #import "KTSettings.h"
 #import "KTDebugLogger.h"
+#include <unistd.h>
 
 static NSString * const KTStoreKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.plist";
 static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
@@ -37,7 +38,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 - (instancetype)init {
     if ((self=[super init])) {
         NSArray *saved=[NSArray arrayWithContentsOfFile:KTStoreKey];
-        KTDebugLog(@"MANAGER_INIT bundle=%@ history=%lu", NSBundle.mainBundle.bundleIdentifier ?: @"", (unsigned long)([saved isKindOfClass:NSArray.class] ? saved.count : 0));
+        KTDebugLog(@"INIT pid=%d app=%@ bundle=%@ history=%lu", getpid(), NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"", (unsigned long)saved.count);
         _mutableItems=[NSMutableArray array];
         for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
@@ -48,6 +49,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 - (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
 
 - (void)save {
+    KTDebugLog(@"SAVE count=%lu", (unsigned long)self.mutableItems.count);
     NSMutableArray *a=[NSMutableArray arrayWithCapacity:self.mutableItems.count];
     for (KTClipboardItem *i in self.mutableItems) [a addObject:i.dictionary];
     [a writeToFile:KTStoreKey atomically:YES];
@@ -62,22 +64,22 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     if (!KTEnabled() || !KTRecordClipboard()) return;
     UIPasteboard *pb=UIPasteboard.generalPasteboard;
     NSInteger change=pb.changeCount;
-    KTDebugLog(@"PB change=%ld bundle=%@", (long)change, NSBundle.mainBundle.bundleIdentifier ?: @"");
+    KTDebugLog(@"PB change=%ld pid=%d", (long)change, getpid());
     NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults];
     NSNumber *last=[defaults objectForKey:KTLastPasteboardChange];
-    if (last && last.integerValue == change) { KTDebugLog(@"PB_SKIP same=%ld", (long)change); return; }
+    if (last && last.integerValue == change) return;
     [defaults setObject:@(change) forKey:KTLastPasteboardChange];
 
     NSString *text=pb.string;
-    KTDebugLog(@"PB_TEXT length=%lu", (unsigned long)text.length);
-    if (!text.length) { KTDebugLog(@"PB_SKIP empty"); return; }
+    KTDebugLog(@"READ text=%lu", (unsigned long)text.length);
+    if (!text.length) return;
 
     NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
     NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
     NSDate *recordedAt=NSDate.date;
+    KTDebugLog(@"CAPTURE bundle=%@ app=%@", bid, name);
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        KTDebugLog(@"CAPTURE bundle=%@", bid);
         [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:recordedAt];
     });
 }
@@ -107,7 +109,6 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     i.recordedAt=recordedAt ?: NSDate.date;
     i.favorite=NO;
     [self.mutableItems insertObject:i atIndex:0];
-    KTDebugLog(@"ADD bundle=%@ count=%lu", bid ?: @"", (unsigned long)self.mutableItems.count);
     while (self.mutableItems.count>KTHistoryLimit()) {
         NSUInteger removeIndex=NSNotFound;
         for (NSInteger n=(NSInteger)self.mutableItems.count-1; n>=0; n--) {
@@ -116,8 +117,8 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
         if (removeIndex==NSNotFound) break;
         [self.mutableItems removeObjectAtIndex:removeIndex];
     }
+    KTDebugLog(@"ADD count=%lu", (unsigned long)self.mutableItems.count);
     [self save];
-    KTDebugLog(@"SAVE count=%lu", (unsigned long)self.mutableItems.count);
 }
 
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name {
