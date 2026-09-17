@@ -53,7 +53,7 @@ static NSString *KTName(void){
     for(NSString*n in @[@"displayName",@"localizedName"]){
         SEL s=NSSelectorFromString(n);
         id v=(a&&[a respondsToSelector:s])?((id(*)(id,SEL))objc_msgSend)(a,s):nil;
-        if([v isKindOfClass:NSString.class]&&v.length)return v;
+        if([v isKindOfClass:NSString.class]&&((NSString *)v).length)return v;
     }
     return KTBundle();
 }
