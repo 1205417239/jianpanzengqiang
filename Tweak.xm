@@ -88,6 +88,7 @@ static void KTHaptic(void) {
 }
 
 static void KTClipboardClose(void) {
+    KTDebugLog(@"CLOSE");
     UIWindow *window = KTClipboardWindow;
     KTClipboardWindow = nil;
     KTClipboardController = nil;
@@ -99,7 +100,7 @@ static void KTClipboardClose(void) {
 
 static void KTClipboardOpen(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (KTClipboardWindow) return;
+        if (KTClipboardWindow) { KTDebugLog(@"OPEN ignored alreadyOpen"); return; }
         UIResponder *input = KTInput();
         UIWindowScene *scene = KTActiveScene();
         if (!input || !scene) return;
@@ -107,7 +108,7 @@ static void KTClipboardOpen(void) {
         KTClipboardInput = input;
         [input resignFirstResponder];
 
-        KTDebugLog(@"OPEN input=%@ scene=%@", NSStringFromClass(input.class), scene ? @"YES" : @"NO");
+        KTDebugLog(@"OPEN input=%@ scene=%@ app=%@ bundle=%@", NSStringFromClass(input.class), scene ? @"YES" : @"NO", NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"");
         KTClipboardPassThroughWindow *window = [[KTClipboardPassThroughWindow alloc] initWithWindowScene:scene];
         window.frame = scene.coordinateSpace.bounds;
         window.backgroundColor = UIColor.clearColor;
@@ -179,6 +180,7 @@ static void KTInstallToolbar(UIView *dock) {
     BOOL result = %orig;
     if (result && [self conformsToProtocol:@protocol(UITextInput)]) {
         KTClipboardInput = self;
+        KTDebugLog(@"INPUT class=%@ app=%@ bundle=%@", NSStringFromClass(self.class), NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"");
     }
     return result;
 }
@@ -198,30 +200,35 @@ static void KTInstallToolbar(UIView *dock) {
 
 %new
 - (void)kt_clipboard:(UIButton *)sender {
+    KTDebugLog(@"BUTTON clipboard");
     KTHaptic();
     KTClipboardOpen();
 }
 
 %new
 - (void)kt_selectAll:(UIButton *)sender {
+    KTDebugLog(@"BUTTON selectAll");
     KTHaptic();
     [[UIApplication sharedApplication] sendAction:@selector(selectAll:) to:nil from:nil forEvent:nil];
 }
 
 %new
 - (void)kt_paste:(UIButton *)sender {
+    KTDebugLog(@"BUTTON paste");
     KTHaptic();
     [[UIApplication sharedApplication] sendAction:@selector(paste:) to:nil from:nil forEvent:nil];
 }
 
 %new
 - (void)kt_undo:(UIButton *)sender {
+    KTDebugLog(@"BUTTON undo");
     KTHaptic();
     [[UIApplication sharedApplication] sendAction:@selector(undo:) to:nil from:nil forEvent:nil];
 }
 
 %new
 - (void)kt_dismiss:(UIButton *)sender {
+    KTDebugLog(@"BUTTON dismiss");
     KTHaptic();
     Class cls = objc_getClass("UIKeyboardImpl");
     if (cls && [cls respondsToSelector:@selector(activeInstance)]) {
@@ -238,7 +245,7 @@ static void KTInstallToolbar(UIView *dock) {
 
 %ctor {
     @autoreleasepool {
-        KTDebugLog(@"LOAD pid=%d app=%@ bundle=%@", getpid(), NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"");
+        KTDebugLog(@"LOAD app=%@ bundle=%@", NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"");
         [KTClipboardManager.sharedManager startMonitoring];
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), NULL, NULL,

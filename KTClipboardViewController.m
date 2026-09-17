@@ -1,5 +1,6 @@
 #import "KTClipboardViewController.h"
 #import "KTClipboardManager.h"
+#import "KTDebugLogger.h"
 #import "KTSettings.h"
 #import <UIKit/UIKit.h>
 
@@ -75,6 +76,7 @@
 }
 
 - (void)viewDidLoad {
+    KTDebugLog(@"UI viewDidLoad");
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
 
@@ -220,15 +222,18 @@
 }
 
 - (void)clearImages {
+    KTDebugLog(@"UI clearImages");
     [KTClipboardManager.sharedManager clearImages];
 }
 
 - (void)clearHistory {
+    KTDebugLog(@"UI clearHistory");
     [KTClipboardManager.sharedManager clearClipboardHistory];
     [self reload];
 }
 
 - (void)reload {
+    KTDebugLog(@"UI reload items=%lu", (unsigned long)KTClipboardManager.sharedManager.items.count);
     self.items = self.segment.selectedSegmentIndex == 1 ? KTClipboardManager.sharedManager.favorites : KTClipboardManager.sharedManager.items;
     [self.table reloadData];
 }
@@ -293,6 +298,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.row >= self.items.count) return;
     KTClipboardItem *item = self.items[indexPath.row];
+    KTDebugLog(@"UI paste row=%ld len=%lu input=%@", (long)indexPath.row, (unsigned long)item.text.length, self.input ? NSStringFromClass(self.input.class) : @"nil");
     if (item.text.length && self.input) [KTClipboardManager.sharedManager pasteItem:item intoInput:self.input];
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     [self closePage];
@@ -303,6 +309,7 @@
     KTClipboardItem *item = self.items[indexPath.row];
     UIContextualAction *favorite = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:@"" handler:^(UIContextualAction *action, UIView *sourceView, void (^completionHandler)(BOOL)) {
         BOOL value = !item.favorite;
+        KTDebugLog(@"UI favorite row=%ld value=%d", (long)indexPath.row, value);
         [KTClipboardManager.sharedManager setFavorite:value forItem:item];
         completionHandler(YES);
         [self reload];
@@ -311,6 +318,7 @@
     favorite.backgroundColor = UIColor.systemOrangeColor;
 
     UIContextualAction *delete = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:@"" handler:^(UIContextualAction *action, UIView *sourceView, void (^completionHandler)(BOOL)) {
+        KTDebugLog(@"UI remove row=%ld", (long)indexPath.row);
         [KTClipboardManager.sharedManager removeItem:item];
         completionHandler(YES);
         [self reload];

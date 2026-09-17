@@ -9,7 +9,8 @@
 @implementation KTDebugViewController
 - (NSArray *)specifiers { return @[]; }
 - (void)loadView {
-    UITableView *table=[[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    [super loadView];
+    UITableView *table=(UITableView *)self.view;
     UITextView *v=[[UITextView alloc] initWithFrame:CGRectZero];
     v.editable=NO;
     v.selectable=YES;
@@ -26,12 +27,19 @@
         [v.bottomAnchor constraintEqualToAnchor:table.bottomAnchor]
     ]];
     self.logView=v;
-    self.view=table;
 }
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title=@"调试日志";
+    self.title=@"插件运行日志";
     self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc] initWithTitle:@"清空" style:UIBarButtonItemStylePlain target:self action:@selector(clearLog)];
 }
-- (void)clearLog { KTDebugLogClear(); self.logView.text=@"暂无调试记录"; }
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    self.logView.text=KTDebugLogText();
+    [self.logView scrollRangeToVisible:NSMakeRange(self.logView.text.length,0)];
+}
+- (void)clearLog {
+    KTDebugLogClear();
+    self.logView.text=@"暂无插件运行记录";
+}
 @end

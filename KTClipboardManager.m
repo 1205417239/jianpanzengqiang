@@ -42,6 +42,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
         _mutableItems=[NSMutableArray array];
         for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
+        KTDebugLog(@"INIT observer=registered pbChange=%ld", (long)UIPasteboard.generalPasteboard.changeCount);
     }
     return self;
 }
@@ -56,52 +57,66 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 }
 
 - (void)startMonitoring {
-    KTDebugLog(@"MONITOR enabled=%d record=%d", KTEnabled(), KTRecordClipboard());
-    if (!KTEnabled() || !KTRecordClipboard()) return;
+    BOOL enabled=KTEnabled();
+    BOOL record=KTRecordClipboard();
+    KTDebugLog(@"MONITOR enabled=%d record=%d change=%ld", enabled, record, (long)UIPasteboard.generalPasteboard.changeCount);
+    if (!enabled || !record) return;
+    KTDebugLog(@"MONITOR active");
 }
 
 - (void)pasteboardChanged:(NSNotification *)note {
-    if (!KTEnabled() || !KTRecordClipboard()) return;
+    BOOL enabled=KTEnabled();
+    BOOL record=KTRecordClipboard();
+    KTDebugLog(@"PB notification enabled=%d record=%d change=%ld", enabled, record, (long)UIPasteboard.generalPasteboard.changeCount);
+    if (!enabled || !record) { KTDebugLog(@"PB ignored"); return; }
     UIPasteboard *pb=UIPasteboard.generalPasteboard;
     NSInteger change=pb.changeCount;
     KTDebugLog(@"PB change=%ld pid=%d", (long)change, getpid());
     NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults];
     NSNumber *last=[defaults objectForKey:KTLastPasteboardChange];
-    if (last && last.integerValue == change) return;
+    if (last && last.integerValue == change) { KTDebugLog(@"PB duplicate change=%ld", (long)change); return; }
     [defaults setObject:@(change) forKey:KTLastPasteboardChange];
 
     NSString *text=pb.string;
     KTDebugLog(@"READ text=%lu", (unsigned long)text.length);
-    if (!text.length) return;
+    if (!text.length) { KTDebugLog(@"PB text=EMPTY"); return; }
 
     NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
     NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
     NSDate *recordedAt=NSDate.date;
     KTDebugLog(@"CAPTURE bundle=%@ app=%@", bid, name);
 
+    KTDebugLog(@"PB captureQueued bundle=%@ app=%@ len=%lu", bid, name, (unsigned long)text.length);
     dispatch_async(dispatch_get_main_queue(), ^{
+        KTDebugLog(@"PB captureRun");
         [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:recordedAt];
     });
 }
 
 - (void)addCurrentClipboard {
-    if (!KTEnabled() || !KTRecordClipboard()) return;
+    KTDebugLog(@"MANUAL_CAPTURE begin");
+    BOOL enabled=KTEnabled();
+    BOOL record=KTRecordClipboard();
+    if (!enabled || !record) { KTDebugLog(@"MANUAL_CAPTURE ignored enabled=%d record=%d", enabled, record); return; }
     UIPasteboard *pb=UIPasteboard.generalPasteboard;
     NSInteger change=pb.changeCount;
     NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults];
     NSNumber *last=[defaults objectForKey:KTLastPasteboardChange];
-    if (last && last.integerValue == change) return;
+    if (last && last.integerValue == change) { KTDebugLog(@"MANUAL_CAPTURE duplicate change=%ld", (long)change); return; }
     [defaults setObject:@(change) forKey:KTLastPasteboardChange];
 
     NSString *text=pb.string;
-    if (!text.length) return;
+    KTDebugLog(@"MANUAL_CAPTURE read len=%lu change=%ld", (unsigned long)text.length, (long)change);
+    if (!text.length) { KTDebugLog(@"MANUAL_CAPTURE text=EMPTY"); return; }
     NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
     NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
+    KTDebugLog(@"MANUAL_CAPTURE add bundle=%@ app=%@ len=%lu", bid, name, (unsigned long)text.length);
     [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:NSDate.date];
 }
 
 - (void)addCapturedText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name recordedAt:(NSDate *)recordedAt {
-    if (!text.length) return;
+    if (!text.length) { KTDebugLog(@"ADD ignored EMPTY"); return; }
+    KTDebugLog(@"ADD begin bundle=%@ app=%@ len=%lu before=%lu", bid ?: @"", name ?: @"", (unsigned long)text.length, (unsigned long)self.mutableItems.count);
     KTClipboardItem *i=[KTClipboardItem new];
     i.text=text;
     i.bundleIdentifier=bid ?: @"";
@@ -119,6 +134,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     }
     KTDebugLog(@"ADD count=%lu", (unsigned long)self.mutableItems.count);
     [self save];
+    KTDebugLog(@"ADD done after=%lu", (unsigned long)self.mutableItems.count);
 }
 
 - (void)addText:(NSString *)text bundleIdentifier:(NSString *)bid appName:(NSString *)name {

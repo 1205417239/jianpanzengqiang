@@ -101,7 +101,7 @@
             <key>detail</key>
             <string>KTDebugViewController</string>
             <key>label</key>
-            <string>调试日志</string>
+            <string>插件运行日志</string>
         </dict>
 
         <dict>
