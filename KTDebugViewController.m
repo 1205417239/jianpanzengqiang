@@ -9,14 +9,17 @@
 @implementation KTDebugViewController
 - (NSArray *)specifiers { return @[]; }
 - (void)loadView {
-    UITextView *v=[[UITextView alloc] initWithFrame:CGRectZero];
+    UITableView *table=[[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    self.view=table;
+    UITextView *v=[[UITextView alloc] initWithFrame:table.bounds];
+    v.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
     v.editable=NO;
     v.selectable=YES;
     v.font=[UIFont monospacedSystemFontOfSize:12.0 weight:UIFontWeightRegular];
     v.backgroundColor=UIColor.systemBackgroundColor;
     v.textColor=UIColor.labelColor;
     v.textContainerInset=UIEdgeInsetsMake(12,12,12,12);
-    self.view=v;
+    [table addSubview:v];
     self.logView=v;
 }
 - (void)viewDidLoad {
