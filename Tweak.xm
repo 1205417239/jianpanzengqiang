@@ -9,27 +9,27 @@ static NSInteger const KTTag = 58731;
 static UIWindow *KTClipboardWindow;
 static KTClipboardViewController *KTClipboardController;
 static UIResponder *KTClipboardInput;
-
 static NSString *KTForegroundBundleIdentifier;
 static NSString *KTForegroundAppName;
 
-NSString *KTCurrentForegroundBundleIdentifier(void) {
-    return KTForegroundBundleIdentifier ?: NSBundle.mainBundle.bundleIdentifier ?: @"";
-}
-
-NSString *KTCurrentForegroundAppName(void) {
-    return KTForegroundAppName ?: NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: KTCurrentForegroundBundleIdentifier();
-}
-
 static void KTUpdateForegroundApp(void) {
-    UIApplication *app = UIApplication.sharedApplication;
-    if (!app || app.applicationState != UIApplicationStateActive) return;
     NSBundle *bundle = NSBundle.mainBundle;
-    KTForegroundBundleIdentifier = [bundle.bundleIdentifier copy];
+    NSString *bid = bundle.bundleIdentifier ?: @"";
     NSString *name = bundle.localizedInfoDictionary[@"CFBundleDisplayName"];
     if (!name.length) name = bundle.infoDictionary[@"CFBundleDisplayName"];
     if (!name.length) name = bundle.infoDictionary[@"CFBundleName"];
-    KTForegroundAppName = [name.length ? name : KTForegroundBundleIdentifier copy];
+    KTForegroundBundleIdentifier = [bid copy];
+    KTForegroundAppName = [name.length ? name : bid copy];
+}
+
+NSString *KTCurrentForegroundBundleIdentifier(void) {
+    if (!KTForegroundBundleIdentifier.length) KTUpdateForegroundApp();
+    return KTForegroundBundleIdentifier ?: @"";
+}
+
+NSString *KTCurrentForegroundAppName(void) {
+    if (!KTForegroundAppName.length) KTUpdateForegroundApp();
+    return KTForegroundAppName ?: @"";
 }
 
 @interface KTClipboardPassThroughWindow : UIWindow
@@ -258,11 +258,10 @@ static void KTInstallToolbar(UIView *dock) {
 %ctor {
     @autoreleasepool {
         KTUpdateForegroundApp();
-        NSNotificationCenter *nc = NSNotificationCenter.defaultCenter;
-        [nc addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
             KTUpdateForegroundApp();
         }];
-        [nc addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        [[NSNotificationCenter defaultCenter] addObserverForName:UISceneDidActivateNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
             KTUpdateForegroundApp();
         }];
         [KTClipboardManager.sharedManager startMonitoring];

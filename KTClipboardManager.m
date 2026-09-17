@@ -1,8 +1,8 @@
 #import "KTClipboardManager.h"
 #import "KTSettings.h"
 
-extern NSString *KTCurrentForegroundBundleIdentifier(void);
 extern NSString *KTCurrentForegroundAppName(void);
+extern NSString *KTCurrentForegroundBundleIdentifier(void);
 
 static NSString * const KTStoreKey = @"/var/mobile/Library/Preferences/com.keyboardtoolskayoko.history.plist";
 static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
@@ -70,9 +70,9 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     NSString *text=pb.string;
     if (!text.length) return;
 
-    NSString *bid=KTCurrentForegroundBundleIdentifier();
+    NSString *bid=KTCurrentForegroundBundleIdentifier() ?: @"";
     NSString *name=KTCurrentForegroundAppName();
-    if (!bid.length) return;
+    if (!name.length) name=bid;
     NSDate *recordedAt=NSDate.date;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -91,9 +91,9 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
     NSString *text=pb.string;
     if (!text.length) return;
-    NSString *bid=KTCurrentForegroundBundleIdentifier();
+    NSString *bid=KTCurrentForegroundBundleIdentifier() ?: @"";
     NSString *name=KTCurrentForegroundAppName();
-    if (!bid.length) return;
+    if (!name.length) name=bid;
     [self addCapturedText:text bundleIdentifier:bid appName:name recordedAt:NSDate.date];
 }
 
