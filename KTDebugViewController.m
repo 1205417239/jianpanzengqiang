@@ -9,23 +9,14 @@
 @implementation KTDebugViewController
 - (NSArray *)specifiers { return @[]; }
 - (void)loadView {
-    [super loadView];
-    UITableView *table=(UITableView *)self.view;
     UITextView *v=[[UITextView alloc] initWithFrame:CGRectZero];
     v.editable=NO;
     v.selectable=YES;
     v.font=[UIFont monospacedSystemFontOfSize:12.0 weight:UIFontWeightRegular];
-    v.text=KTDebugLogText();
     v.backgroundColor=UIColor.systemBackgroundColor;
     v.textColor=UIColor.labelColor;
-    v.translatesAutoresizingMaskIntoConstraints=NO;
-    [table addSubview:v];
-    [NSLayoutConstraint activateConstraints:@[
-        [v.topAnchor constraintEqualToAnchor:table.topAnchor],
-        [v.leadingAnchor constraintEqualToAnchor:table.leadingAnchor],
-        [v.trailingAnchor constraintEqualToAnchor:table.trailingAnchor],
-        [v.bottomAnchor constraintEqualToAnchor:table.bottomAnchor]
-    ]];
+    v.textContainerInset=UIEdgeInsetsMake(12,12,12,12);
+    self.view=v;
     self.logView=v;
 }
 - (void)viewDidLoad {
@@ -36,10 +27,12 @@
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.logView.text=KTDebugLogText();
-    [self.logView scrollRangeToVisible:NSMakeRange(self.logView.text.length,0)];
+    self.logView.selectedRange=NSMakeRange(0,0);
+    [self.logView setContentOffset:CGPointZero animated:NO];
 }
 - (void)clearLog {
     KTDebugLogClear();
     self.logView.text=@"暂无插件运行记录";
+    [self.logView setContentOffset:CGPointZero animated:NO];
 }
 @end

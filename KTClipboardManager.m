@@ -30,6 +30,8 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
 
 @interface KTClipboardManager ()
 @property(nonatomic,strong) NSMutableArray<KTClipboardItem *> *mutableItems;
+@property(nonatomic,strong) NSTimer *runtimeTimer;
+@property(nonatomic) NSInteger runtimeChangeCount;
 @end
 
 @implementation KTClipboardManager
@@ -41,6 +43,7 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
         KTDebugLog(@"INIT pid=%d app=%@ bundle=%@ history=%lu", getpid(), NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"", NSBundle.mainBundle.bundleIdentifier ?: @"", (unsigned long)saved.count);
         _mutableItems=[NSMutableArray array];
         for (NSDictionary *d in saved) if ([d isKindOfClass:NSDictionary.class]) [_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];
+        self.runtimeChangeCount=UIPasteboard.generalPasteboard.changeCount;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pasteboardChanged:) name:UIPasteboardChangedNotification object:UIPasteboard.generalPasteboard];
         KTDebugLog(@"INIT observer=registered pbChange=%ld", (long)UIPasteboard.generalPasteboard.changeCount);
     }
@@ -61,7 +64,27 @@ static NSString * const KTLastPasteboardChange = @"KTLastPasteboardChangeCount";
     BOOL record=KTRecordClipboard();
     KTDebugLog(@"MONITOR enabled=%d record=%d change=%ld", enabled, record, (long)UIPasteboard.generalPasteboard.changeCount);
     if (!enabled || !record) return;
-    KTDebugLog(@"MONITOR active");
+    KTDebugLog(@"MONITOR active polling=YES change=%ld", (long)self.runtimeChangeCount);
+    if (!self.runtimeTimer) {
+        self.runtimeTimer=[NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(runtimePoll:) userInfo:nil repeats:YES];
+        KTDebugLog(@"MONITOR timerStarted");
+    }
+}
+
+- (void)runtimePoll:(NSTimer *)timer {
+    if (!KTEnabled() || !KTRecordClipboard()) return;
+    UIPasteboard *pb=UIPasteboard.generalPasteboard;
+    NSInteger change=pb.changeCount;
+    if (change==self.runtimeChangeCount) return;
+    NSInteger old=self.runtimeChangeCount;
+    self.runtimeChangeCount=change;
+    KTDebugLog(@"POLL change=%ld old=%ld", (long)change, (long)old);
+    NSString *text=pb.string;
+    KTDebugLog(@"POLL read=%lu", (unsigned long)text.length);
+    if (!text.length) return;
+    NSString *bid=NSBundle.mainBundle.bundleIdentifier ?: @"";
+    NSString *name=NSBundle.mainBundle.localizedInfoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: bid;
+    KTDebugLog(@"POLL capture app=%@ bundle=%@ len=%lu", name, bid, (unsigned long)text.length);
 }
 
 - (void)pasteboardChanged:(NSNotification *)note {

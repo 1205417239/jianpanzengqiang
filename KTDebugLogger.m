@@ -1,3 +1,4 @@
+#import <UIKit/UIKit.h>
 #import <unistd.h>
 #import "KTDebugLogger.h"
 
@@ -10,11 +11,14 @@ void KTDebugLog(NSString *format, ...) {
     NSString *body=[[NSString alloc] initWithFormat:format arguments:args];
     va_end(args);
     if (!body.length) return;
-    NSString *line=[NSString stringWithFormat:@"%@ pid=%d %@\n", [[NSDate date] descriptionWithLocale:nil], getpid(), body];
+    NSString *app=NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: NSBundle.mainBundle.infoDictionary[@"CFBundleName"] ?: @"";
+    NSString *bundle=NSBundle.mainBundle.bundleIdentifier ?: @"";
+    NSString *line=[NSString stringWithFormat:@"%@ pid=%d app=%@ bundle=%@ %@\n", [[NSDate date] descriptionWithLocale:nil], getpid(), app, bundle, body];
     NSFileManager *fm=NSFileManager.defaultManager;
-    [fm createFileAtPath:KTDebugLogPath contents:nil attributes:nil];
     @try {
         NSFileHandle *h=[NSFileHandle fileHandleForWritingAtPath:KTDebugLogPath];
+        if (!h) { [fm createFileAtPath:KTDebugLogPath contents:nil attributes:nil]; h=[NSFileHandle fileHandleForWritingAtPath:KTDebugLogPath]; }
+        if (!h) return;
         [h seekToEndOfFile];
         [h writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
         [h closeFile];
@@ -23,15 +27,20 @@ void KTDebugLog(NSString *format, ...) {
     if ([a[NSFileSize] unsignedLongLongValue] > 24000) {
         NSString *all=[NSString stringWithContentsOfFile:KTDebugLogPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
         NSArray *rows=[all componentsSeparatedByString:@"\n"];
-        NSUInteger start=rows.count>120 ? rows.count-120 : 0;
-        NSString *trim=[[rows subarrayWithRange:NSMakeRange(start, rows.count-start)] componentsJoinedByString:@"\n"];
+        NSUInteger count=rows.count;
+        NSUInteger start=count>160 ? count-160 : 0;
+        NSString *trim=[[rows subarrayWithRange:NSMakeRange(start,count-start)] componentsJoinedByString:@"\n"];
         [trim writeToFile:KTDebugLogPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
 }
 
 NSString *KTDebugLogText(void) {
     NSString *s=[NSString stringWithContentsOfFile:KTDebugLogPath encoding:NSUTF8StringEncoding error:nil];
-    return s.length ? s : @"暂无插件运行记录";
+    if (!s.length) return @"暂无插件运行记录";
+    NSArray *rows=[s componentsSeparatedByString:@"\n"];
+    NSMutableArray *valid=[NSMutableArray array];
+    for (NSString *row in rows) if (row.length) [valid addObject:row];
+    return valid.count ? [[[valid reverseObjectEnumerator] allObjects] componentsJoinedByString:@"\n"] : @"暂无插件运行记录";
 }
 
 void KTDebugLogClear(void) {
