@@ -20,17 +20,21 @@ static NSString *KTName(void){id a=KTFront();for(NSString*n in @[@"displayName",
 + (instancetype)itemWithDictionary:(NSDictionary*)d{KTClipboardItem*i=[KTClipboardItem new];i.text=[d[@"text"]isKindOfClass:NSString.class]?d[@"text"]:@"";i.bundleIdentifier=[d[@"bundle"]isKindOfClass:NSString.class]?d[@"bundle"]:@"";i.appName=[d[@"app"]isKindOfClass:NSString.class]?d[@"app"]:@"";NSNumber*t=[d[@"timestamp"]isKindOfClass:NSNumber.class]?d[@"timestamp"]:nil;i.recordedAt=t?[NSDate dateWithTimeIntervalSince1970:t.doubleValue]:NSDate.date;i.favorite=[d[@"favorite"]boolValue];return i;}
 @end
 
+@interface KTClipboardManager ()
+@property(nonatomic,strong) NSMutableArray *mutableItems;
+@end
+
 @implementation KTClipboardManager
 + (instancetype)sharedManager{static KTClipboardManager*m;static dispatch_once_t once;dispatch_once(&once,^{m=[self new];});return m;}
-- (instancetype)init{if((self=[super init]))_mutableItems=[NSMutableArray array];return self;}
-- (void)reloadFromDisk{NSArray*h=KTRead()[@"history"];_mutableItems=[NSMutableArray array];for(NSDictionary*d in [h isKindOfClass:NSArray.class]?h:@[])if([d isKindOfClass:NSDictionary.class])[_mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];}
+- (instancetype)init{if((self=[super init]))self.mutableItems=[NSMutableArray array];return self;}
+- (void)reloadFromDisk{NSArray*h=KTRead()[@"history"];self.mutableItems=[NSMutableArray array];for(NSDictionary*d in [h isKindOfClass:NSArray.class]?h:@[])if([d isKindOfClass:NSDictionary.class])[self.mutableItems addObject:[KTClipboardItem itemWithDictionary:d]];}
 - (void)startMonitoring{[self reloadFromDisk];}
 - (void)pullPasteboardChanges{if(!KTEnabled()||!KTRecordClipboard())return;UIPasteboard*p=UIPasteboard.generalPasteboard;if(!p.hasStrings&&!p.hasImages)return;NSString*b=KTBundle(),*n=KTName();for(NSString*t in p.strings)if(t.length)[self addCapturedText:t bundleIdentifier:b appName:n recordedAt:NSDate.date];}
 - (void)addCurrentClipboard{[self pullPasteboardChanges];}
 - (void)addCapturedText:(NSString*)t bundleIdentifier:(NSString*)b appName:(NSString*)n recordedAt:(NSDate*)date{if(!t.length)return;NSMutableDictionary*j=KTJSON();NSMutableArray*h=[j[@"history"]mutableCopy];for(NSDictionary*d in[h copy])if([d[@"text"]isEqualToString:t]){[h removeObject:d];break;}[h insertObject:@{ @"text":t, @"bundle":b?:@"", @"app":n?:@"", @"timestamp":@((date?:NSDate.date).timeIntervalSince1970), @"favorite":@NO} atIndex:0];NSUInteger lim=MAX(1,(NSUInteger)KTHistoryLimit());while(h.count>lim){NSInteger r=NSNotFound;for(NSInteger i=h.count-1;i>=0;i--)if(![h[i][@"favorite"]boolValue]){r=i;break;}if(r==NSNotFound)break;[h removeObjectAtIndex:r];}j[@"history"]=h;KTWrite(j);[self reloadFromDisk];}
 - (void)addText:(NSString*)t bundleIdentifier:(NSString*)b appName:(NSString*)n{[self addCapturedText:t bundleIdentifier:b appName:n recordedAt:NSDate.date];}
-- (NSArray*)items{[self reloadFromDisk];return[_mutableItems copy];}
-- (NSArray*)favorites{[self reloadFromDisk];NSMutableArray*a=[NSMutableArray array];for(KTClipboardItem*i in _mutableItems)if(i.favorite)[a addObject:i];return a;}
+- (NSArray*)items{[self reloadFromDisk];return[self.mutableItems copy];}
+- (NSArray*)favorites{[self reloadFromDisk];NSMutableArray*a=[NSMutableArray array];for(KTClipboardItem*i in self.mutableItems)if(i.favorite)[a addObject:i];return a;}
 - (void)setFavorite:(BOOL)v forItem:(KTClipboardItem*)item{if(!item)return;NSMutableDictionary*j=KTJSON();NSMutableArray*h=[j[@"history"]mutableCopy];for(NSUInteger i=0;i<h.count;i++){NSMutableDictionary*d=[h[i]mutableCopy];if([d[@"text"]isEqualToString:item.text]){d[@"favorite"]=@(v);h[i]=d;break;}}j[@"history"]=h;KTWrite(j);[self reloadFromDisk];}
 - (void)removeItem:(KTClipboardItem*)item{if(!item)return;NSMutableDictionary*j=KTJSON();NSMutableArray*h=[j[@"history"]mutableCopy];for(NSDictionary*d in[h copy])if([d[@"text"]isEqualToString:item.text])[h removeObject:d];j[@"history"]=h;KTWrite(j);[self reloadFromDisk];}
 - (void)clearClipboardHistory{NSMutableDictionary*j=KTJSON();j[@"history"]=[j[@"favorites"]mutableCopy]?:[NSMutableArray array];KTWrite(j);[self reloadFromDisk];}
