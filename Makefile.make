@@ -30,3 +30,8 @@ KeyboardToolsKayokoPrefs_RESOURCE_DIRS = Resources
 include $(THEOS_MAKE_PATH)/tweak.mk
 include $(THEOS_MAKE_PATH)/tool.mk
 include $(THEOS_MAKE_PATH)/bundle.mk
+
+# 在 Theos 完成 stage 后，强制修正最终 DEBIAN 维护脚本权限。
+before-package::
+	@chmod 755 $(THEOS_STAGING_DIR)/DEBIAN/postinst 2>/dev/null || true
+	@chmod 755 $(THEOS_STAGING_DIR)/DEBIAN/postrm 2>/dev/null || true
