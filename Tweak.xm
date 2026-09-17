@@ -22,12 +22,12 @@ static void KTUpdateForegroundApp(void) {
     KTForegroundAppName = [name.length ? name : bid copy];
 }
 
-NSString *KTCurrentForegroundBundleIdentifier(void) {
+extern "C" NSString *KTCurrentForegroundBundleIdentifier(void) {
     if (!KTForegroundBundleIdentifier.length) KTUpdateForegroundApp();
     return KTForegroundBundleIdentifier ?: @"";
 }
 
-NSString *KTCurrentForegroundAppName(void) {
+extern "C" NSString *KTCurrentForegroundAppName(void) {
     if (!KTForegroundAppName.length) KTUpdateForegroundApp();
     return KTForegroundAppName ?: @"";
 }
